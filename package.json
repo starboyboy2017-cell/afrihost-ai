@@ -1,0 +1,29 @@
+{
+  "name": "afrihost",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AfriHost AI — PMS SaaS multihôtel pour l'Afrique (monorepo)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @afrihost/core && npm run build -w @afrihost/domain",
+    "test": "npm run test -w @afrihost/core && npm run test -w @afrihost/domain",
+    "typecheck": "npm run typecheck -w @afrihost/core && npm run typecheck -w @afrihost/domain",
+    "dev:web": "npm run dev -w @afrihost/web",
+    "db:generate": "prisma generate --schema database/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema database/schema.prisma",
+    "db:seed": "tsx database/seed.ts",
+    "db:studio": "prisma studio --schema database/schema.prisma"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}

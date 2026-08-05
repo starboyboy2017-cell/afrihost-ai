@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Prisma
+# (migrations are versioned; generated client excluded)
+generated/
+
+# Misc
+*.tsbuildinfo

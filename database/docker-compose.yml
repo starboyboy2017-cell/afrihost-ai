@@ -1,0 +1,25 @@
+version: "3.9"
+
+# Base de données locale pour le développement.
+# En production, PostgreSQL est managé par Supabase (voir .env.example).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: afrihost-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: afrihost
+      POSTGRES_PASSWORD: afrihost
+      POSTGRES_DB: afrihost
+    ports:
+      - "5432:5432"
+    volumes:
+      - afrihost_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afrihost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  afrihost_pgdata:

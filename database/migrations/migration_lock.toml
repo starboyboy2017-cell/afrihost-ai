@@ -1,0 +1,3 @@
+# Migration lockfile — Prisma Migrate
+# Protocole de migration : PostgreSQL
+provider = "postgresql"

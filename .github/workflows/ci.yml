@@ -1,0 +1,58 @@
+name: CI — AfriHost AI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+
+jobs:
+  test-core:
+    name: Typecheck + tests (@afrihost/core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install core deps
+        run: npm --prefix packages/core ci
+      - name: Build core (pour dépendance du domaine)
+        run: npm --prefix packages/core run build
+      - name: Typecheck
+        run: npm --prefix packages/core run typecheck
+      - name: Tests
+        run: npm --prefix packages/core test
+
+  test-domain:
+    name: Typecheck + tests (@afrihost/domain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install core deps
+        run: npm --prefix packages/core ci && npm --prefix packages/core run build
+      - name: Install domain deps
+        run: npm --prefix packages/domain ci
+      - name: Typecheck
+        run: npm --prefix packages/domain run typecheck
+      - name: Tests
+        run: npm --prefix packages/domain test
+
+  prisma-validate:
+    name: Prisma schema validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate schema
+        run: npx -y prisma@5 validate --schema database/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+  # NB : build + deploy Next.js vers Vercel est ajouté quand le module 1 est prêt.
+  #   - name: Build web
+  #     run: npm --prefix apps/web ci && npm --prefix apps/web run build

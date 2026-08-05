@@ -1,0 +1,3986 @@
+// ============================================================================
+// AfriHost AI — Schéma de base de données (Prisma / PostgreSQL)
+// Version : 0.1 (architecture) — socle multitenant + modules cœur.
+// Les tables des modules avancés (IA, BI, channel manager, etc.) sont ajoutées
+// par migrations lors du développement de chaque module (feuille de route).
+//
+// Conventions :
+//   - Toutes les tables métier multihôtel portent `hotelId`.
+//   - Montants : type Int en « minor units » (centimes/centimes du centime local)
+//     pour éviter les erreurs de flottants (ADR-7). Les devises sont explicites.
+//   - Dates : timestamptz (UTC) ; fuseau local de l'hôtel stocké sur `Hotel`.
+//   - soft-delete sur certaines tables maîtres (`deletedAt`).
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+//  MULTITENANT : Organisation & Hôtels
+// ---------------------------------------------------------------------------
+
+model Organisation {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  legalName String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotels            Hotel[]
+  users             User[] // users appartenant à l'organisation (via membership)
+  guests            Guest[]
+  roles             Role[]
+  saasSubscriptions SaasSubscription[]
+  saasInvoices      SaasInvoice[]
+}
+
+model Hotel {
+  id             String   @id @default(uuid())
+  organisationId String
+  name           String
+  slug           String   @unique
+  code           String   @unique // code court interne (ex: DKR-01)
+  address        String?
+  city           String?
+  country        String? // ISO
+  phone          String?
+  email          String?
+  currency       String   @default("XOF") // devise de base de l'hôtel
+  locale         String   @default("fr")
+  timezone       String   @default("Africa/Porto-Novo")
+  vatRate        Decimal  @default(0) @db.Decimal(10, 4) // taxe locale
+  features       Json? // configuration locale (activer modules, options)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organisation          Organisation           @relation(fields: [organisationId], references: [id])
+  memberships           Membership[]
+  rooms                 Room[]
+  roomTypes             RoomType[]
+  ratePlans             RatePlan[]
+  stays                 Stay[]
+  reservations          Reservation[]
+  guests                Guest[] // clients avec fiche locale
+  products              Product[]
+  stockItems            StockItem[]
+  invoices              Invoice[]
+  notifications         Notification[]
+  notificationProviders NotificationProvider[]
+  notificationTemplates NotificationTemplate[]
+  notificationTriggers  NotificationTrigger[]
+  notificationCampaigns NotificationCampaign[]
+  notificationSends     NotificationSend[]
+  aiFeatures            AiFeature[]
+  aiProviders           AiProvider[]
+  aiRequests            AiRequest[]
+  aiSuggestions         AiSuggestion[]
+  aiPredictions         AiPrediction[]
+  aiAlerts              AiAlert[]
+  aiRecommendations     AiRecommendation[]
+  channelAccounts       ChannelAccount[]
+  channelRoomMappings   ChannelRoomMapping[]
+  channelSyncJobs       ChannelSyncJob[]
+  channelSyncLogs       ChannelSyncLog[]
+  channelRateOverrides  ChannelRateOverride[]
+  portalUsers           PortalUser[]
+  portalDevices         PortalDevice[]
+  portalMessages        PortalMessage[]
+  portalServiceRequests PortalServiceRequest[]
+  portalNotifications   PortalNotification[]
+  eventGroups           EventGroup[]
+  eventVenues           EventVenue[]
+  eventEquipments       EventEquipment[]
+  hotelEvents           HotelEvent[]
+  eventContracts        EventContract[]
+  eventServiceOrders    EventServiceOrder[]
+  eventDocuments        EventDocument[]
+  biDashboards          BiDashboard[]
+  biReports             BiReport[]
+  biSchedules           BiSchedule[]
+  adminConfigs          AdminConfig[]
+  saasSubscriptions     SaasSubscription[]
+  saasInvoices          SaasInvoice[]
+  saasManualPayments    SaasManualPayment[]
+  saasPaymentMethods    SaasPaymentMethod[]
+  saasSupportTickets    SaasSupportTicket[]
+  mobileDevices         MobileDevice[]
+  pushTokens            PushToken[]
+  mobileSyncLogs        MobileSyncLog[]
+  housekeepingTasks     HousekeepingTask[]
+  maintenanceRequests   MaintenanceRequest[]
+  laundryItemTypes      LaundryItemType[]
+  laundryItems          LaundryItem[]
+  laundryBatches        LaundryBatch[]
+  laundryLosses         LaundryLoss[]
+  vehicles              Vehicle[]
+  drivers               Driver[]
+  transfers             Transfer[]
+  posPoints             PosPoint[]
+  posMenus              PosMenu[]
+  posOrders             PosOrder[]
+  posPayments           PosPayment[]
+  kitchenStations       KitchenStation[]
+  kitchenOrders         KitchenOrder[]
+  cashRegisters         CashRegister[]
+  cashSessions          CashSession[]
+  cashMovements         CashMovement[]
+  tipRules              TipRule[]
+  tips                  Tip[]
+  discountRules         DiscountRule[]
+  coupons               Coupon[]
+  stockCategories       StockCategory[]
+  suppliers             Supplier[]
+  units                 UnitOfMeasure[]
+  warehouses            Warehouse[]
+  purchaseOrders        PurchaseOrder[]
+  receipts              StockReceipt[]
+  stockMovements        StockMovement[]
+  stockCounts           StockCount[]
+  accountingPeriods     AccountingPeriod[]
+  accounts              Account[]
+  costCenters           CostCenter[]
+  accountingJournals    AccountingJournal[]
+  journalEntries        JournalEntry[]
+  accountBalances       AccountBalance[]
+  bankReconciliations   BankReconciliation[]
+  folios                Folio[]
+  paymentGateways       PaymentGateway[]
+  payments              Payment[]
+  companies             Company[]
+  guestPreferences      GuestPreference[]
+  customerSegments      CustomerSegment[]
+  campaigns             Campaign[]
+  campaignSends         CampaignSend[]
+  customerInteractions  CustomerInteraction[]
+  customerTasks         CustomerTask[]
+  opportunities         Opportunity[]
+  loyaltyPrograms       LoyaltyProgram[]
+  loyaltyProgramLinks   LoyaltyProgramHotel[]
+  loyaltyTiers          LoyaltyTier[]
+  loyaltyRules          LoyaltyRule[]
+  loyaltyRewards        LoyaltyReward[]
+  loyaltyBonuses        LoyaltyBonus[]
+  loyaltyMembers        LoyaltyMember[]
+  loyaltyRedemptions    LoyaltyRedemption[]
+  loyaltyNotifications  LoyaltyNotification[]
+}
+
+// ---------------------------------------------------------------------------
+//  IDENTITÉ & ACCÈS (IAM)
+// ---------------------------------------------------------------------------
+
+// L'utilisateur est global à l'organisation ; son accès par hôtel via Membership.
+model User {
+  id             String    @id @default(uuid())
+  organisationId String
+  email          String    @unique
+  phone          String?
+  passwordHash   String? // géré par Supabase Auth en pratique (auth.uid)
+  authId         String?   @unique // id Supabase Auth
+  firstName      String
+  lastName       String
+  avatarUrl      String?
+  locale         String    @default("fr")
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  // Sécurité (Module 33.1 — bootstrap Super Admin)
+  mustChangePassword Boolean @default(false) // forcer le changement à la 1re connexion
+  twoFactorEnabled   Boolean @default(false) // 2FA
+  twoFactorSecret    String? // secret TOTP (chiffré)
+  isSuperAdmin       Boolean @default(false) // vrai pour un SUPER_ADMIN
+
+  organisation Organisation @relation(fields: [organisationId], references: [id])
+  memberships  Membership[]
+  createdBy    String? // id utilisateur créateur (audit)
+}
+
+// Affectation : un utilisateur est membre d'un hôtel avec un RÔLE.
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  hotelId   String
+  roleId    String
+  isDefault Boolean  @default(false) // hôtel actif par défaut
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  role  Role  @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, hotelId, roleId])
+  @@index([hotelId])
+  @@index([userId]) // résolution rapide des hôtels d'un utilisateur (sélecteur)
+}
+
+// Rôle global d'organisation (ex: Admin, Réception, Housekeeping, Caisse...)
+model Role {
+  id             String   @id @default(uuid())
+  organisationId String
+  name           String // ex: ADMIN, FRONT_DESK, HOUSEKEEPING, POS, ACCOUNTING
+  description    String?
+  isSystem       Boolean  @default(false) // rôles système non supprimables
+  createdAt      DateTime @default(now())
+
+  organisation    Organisation     @relation(fields: [organisationId], references: [id])
+  memberships     Membership[]
+  rolePermissions RolePermission[]
+
+  @@unique([organisationId, name])
+}
+
+// Permission atomique (ex: reservations.cancel, pos.close_cash)
+model Permission {
+  id     String @id @default(uuid())
+  code   String @unique // ex: "reservations.cancel"
+  module String // module propriétaire
+  label  String
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+// ---------------------------------------------------------------------------
+//  JOURNAL D'AUDIT
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organisationId String
+  hotelId        String?
+  actorUserId    String? // qui
+  action         String // ex: "reservation.update"
+  entityType     String // ex: "Reservation"
+  entityId       String?
+  before         Json?
+  after          Json?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([hotelId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+//  CLIENTS (GUESTS) & PROFIL FIDÉLITÉ
+// ---------------------------------------------------------------------------
+
+model Guest {
+  id                String    @id @default(uuid())
+  organisationId    String // historique fidélité global à l'org
+  hotelId           String? // fiche locale principale (nullable si créé via portail)
+  companyId         String? // entreprise / agence partenaire
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
+  nationality       String?
+  idDocument        String?
+  idDocumentType    String?
+  birthDate         DateTime?
+  address           String?
+  tags              String[] // segmentation CRM
+  notes             String?
+  isVip             Boolean   @default(false)
+  loyaltyPoints     Int       @default(0)
+  loyaltyTier       String?   @default("BRONZE")
+  preferredLanguage String?   @default("fr")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime? // soft-delete / anonymisation RGPD (ADR-013)
+
+  organisation         Organisation?         @relation(fields: [organisationId], references: [id])
+  hotel                Hotel?                @relation(fields: [hotelId], references: [id])
+  company              Company?              @relation(fields: [companyId], references: [id])
+  reservations         Reservation[]
+  loyaltyTransactions  LoyaltyTransaction[]
+  loyaltyMembers       LoyaltyMember[]
+  loyaltyRedemptions   LoyaltyRedemption[]
+  loyaltyNotifications LoyaltyNotification[]
+  invoices             Invoice[]
+  stays                Stay[]
+  transfers            Transfer[]
+  folios               Folio[]
+  preferences          GuestPreference[]
+  interactions         CustomerInteraction[]
+  tasks                CustomerTask[]
+  opportunities        Opportunity[]
+  campaignSends        CampaignSend[]
+  PortalUser           PortalUser?
+
+  @@unique([organisationId, email])
+  @@index([hotelId])
+}
+
+// ---------------------------------------------------------------------------
+//  CHAMBRES & TYPES DE CHAMBRES
+// ---------------------------------------------------------------------------
+
+model RoomType {
+  id           String    @id @default(uuid())
+  hotelId      String
+  name         String // ex: Chambre Standard, Suite Exécutive
+  description  String?
+  baseRate     Int // tarif de base en minor units (par nuit) — repli par défaut
+  maxOccupancy Int       @default(2)
+  bedCount     Int       @default(1)
+  amenities    String[] // wifi, clim, vue, ...
+  features     Json?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? // soft-delete pour la sync (ADR-013)
+
+  hotel              Hotel                @relation(fields: [hotelId], references: [id])
+  rooms              Room[]
+  ratePlans          RatePlan[]
+  ChannelRoomMapping ChannelRoomMapping[]
+
+  @@index([hotelId])
+}
+
+// Type de plan tarifaire
+enum RatePlanType {
+  BASE // tarif standard (toute l'année)
+  SEASONAL // selon saison / période
+  WEEKEND // week-end
+  PROMOTIONAL // promotion
+}
+
+// Plan tarifaire flexible (Module 5) — plusieurs plans par type de chambre.
+model RatePlan {
+  id         String       @id @default(uuid())
+  hotelId    String
+  roomTypeId String
+  name       String // ex: "Haute saison", "Basse saison", "Promo été"
+  type       RatePlanType @default(BASE)
+  startDate  DateTime? // début de validité (null = toute l'année)
+  endDate    DateTime? // fin de validité (null = illimité)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime? // soft-delete (ADR-013)
+
+  hotel        Hotel                 @relation(fields: [hotelId], references: [id])
+  roomType     RoomType              @relation(fields: [roomTypeId], references: [id])
+  prices       RatePlanPrice[]
+  restrictions RatePlanRestriction[]
+
+  @@index([hotelId])
+  @@index([roomTypeId])
+  @@index([hotelId, roomTypeId])
+}
+
+// Prix d'un plan par DEVISE (multi-pays). Montant en minor units / nuit.
+model RatePlanPrice {
+  id         String   @id @default(uuid())
+  ratePlanId String
+  currency   String // ISO 4217 (XOF, XAF, NGN, GHS, MAD, EUR, USD...)
+  amount     Int // minor units par nuit
+  createdAt  DateTime @default(now())
+
+  ratePlan RatePlan @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
+
+  @@unique([ratePlanId, currency])
+  @@index([ratePlanId])
+}
+
+// Restrictions du plan (réservables à l'avenir, module réservation)
+model RatePlanRestriction {
+  id                    String   @id @default(uuid())
+  ratePlanId            String
+  minNights             Int? // séjour minimum
+  maxNights             Int? // séjour maximum
+  advanceBookingDays    Int? // réservation max X jours à l'avance
+  minAdvanceBookingDays Int? // réservation min X jours avant
+  maxGuests             Int? // capacité max (adultes+enfants)
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  ratePlan RatePlan @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
+
+  @@index([ratePlanId])
+}
+
+// ÉTAT d'une chambre : statut courant + lien réservation/occupant.
+// L'historique des changements d'état est dans RoomStatusHistory.
+model Room {
+  id             String     @id @default(uuid())
+  hotelId        String
+  roomTypeId     String
+  number         String // numéro/identifiant (ex: "101", "A1")
+  floor          Int?
+  status         RoomStatus // état courant (voir enum)
+  isOutOfOrder   Boolean    @default(false)
+  isOutOfService Boolean    @default(false)
+  keyCardEnabled Boolean    @default(false)
+  photos         String[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime? // soft-delete pour la sync (ADR-013)
+
+  hotel               Hotel                @relation(fields: [hotelId], references: [id])
+  roomType            RoomType             @relation(fields: [roomTypeId], references: [id])
+  reservations        Reservation[]
+  statusHistory       RoomStatusHistory[]
+  housekeepingTasks   HousekeepingTask[]
+  stays               Stay[]
+  roomAssignments     RoomAssignment[]
+  maintenanceRequests MaintenanceRequest[]
+  laundryItems        LaundryItem[]
+  posOrders           PosOrder[]
+
+  @@unique([hotelId, number])
+  @@index([hotelId, status])
+}
+
+model RoomStatusHistory {
+  id        String      @id @default(uuid())
+  roomId    String
+  from      RoomStatus?
+  to        RoomStatus
+  reason    String?
+  changedBy String?
+  createdAt DateTime    @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  DIRTY
+  CLEANING
+  INSPECTED
+  OUT_OF_ORDER
+  OUT_OF_SERVICE
+  RESERVED
+}
+
+// ---------------------------------------------------------------------------
+//  RÉSERVATIONS
+// ---------------------------------------------------------------------------
+
+model Reservation {
+  id                 String            @id @default(uuid())
+  hotelId            String
+  guestId            String?
+  roomId             String?
+  roomTypeId         String? // si pas encore de chambre assignée
+  bookingRef         String            @unique // référence lisible (ex: AH-2026-00042)
+  source             ReservationSource
+  channel            String? // OTA, direct, téléphone, walk-in
+  status             ReservationStatus
+  arrivalDate        DateTime
+  departureDate      DateTime
+  adults             Int               @default(1)
+  children           Int               @default(0)
+  ratePlanId         String?
+  amount             Int // total en minor units
+  taxAmount          Int               @default(0)
+  discountAmount     Int               @default(0)
+  currency           String
+  notes              String?
+  confirmationNumber String? // confirmation OTA
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deletedAt          DateTime? // soft-delete pour la sync (ADR-013)
+
+  hotel         Hotel                      @relation(fields: [hotelId], references: [id])
+  guest         Guest?                     @relation(fields: [guestId], references: [id])
+  room          Room?                      @relation(fields: [roomId], references: [id])
+  payments      Payment[]
+  statusHistory ReservationStatusHistory[]
+  stays         Stay[]
+  transfers     Transfer[]
+  posOrders     PosOrder[]
+  folios        Folio[]
+
+  @@index([hotelId, arrivalDate])
+  @@index([hotelId, status])
+  @@index([guestId])
+}
+
+// Séjour physique d'un client dans une chambre (Module 7 — check-in/check-out).
+model Stay {
+  id            String     @id @default(uuid())
+  hotelId       String
+  reservationId String
+  guestId       String?
+  roomId        String? // chambre courante
+  status        StayStatus @default(ACTIVE)
+  checkInAt     DateTime   @default(now())
+  checkOutAt    DateTime?
+  departureDate DateTime // date de départ planifiée (modifiable par prolongation)
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  hotel       Hotel            @relation(fields: [hotelId], references: [id])
+  reservation Reservation      @relation(fields: [reservationId], references: [id])
+  guest       Guest?           @relation(fields: [guestId], references: [id])
+  room        Room?            @relation(fields: [roomId], references: [id])
+  roomChanges RoomAssignment[]
+
+  @@unique([reservationId])
+  @@index([hotelId, status])
+  @@index([roomId, status])
+}
+
+// Historique des affectations de chambre d'un séjour (changement de chambre).
+model RoomAssignment {
+  id        String    @id @default(uuid())
+  stayId    String
+  roomId    String
+  fromDate  DateTime  @default(now())
+  toDate    DateTime?
+  reason    String?
+  changedBy String?
+  createdAt DateTime  @default(now())
+
+  stay Stay @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@index([stayId])
+}
+
+enum StayStatus {
+  ACTIVE
+  CHECKED_OUT
+}
+
+model ReservationStatusHistory {
+  id            String             @id @default(uuid())
+  reservationId String
+  from          ReservationStatus?
+  to            ReservationStatus
+  reason        String?
+  changedBy     String?
+  createdAt     DateTime           @default(now())
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId, createdAt])
+}
+
+enum ReservationStatus {
+  PROVISIONAL // provisoire
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+  WAITLIST
+}
+
+enum ReservationSource {
+  DIRECT
+  WEBSITE
+  OTA // booking.com, expedia...
+  PHONE
+  WALK_IN
+  CORPORATE
+  AGENCY
+  CHANNEL_MANAGER
+}
+
+// ---------------------------------------------------------------------------
+//  FACTURATION & PAIEMENTS
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id             String        @id @default(uuid())
+  hotelId        String
+  reservationId  String?
+  folioId        String?
+  guestId        String
+  number         String        @unique // numéro de facture
+  type           InvoiceType
+  status         InvoiceStatus
+  subtotal       Int
+  taxAmount      Int
+  discountAmount Int
+  total          Int
+  currency       String
+  dueDate        DateTime?
+  issuedAt       DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime? // soft-delete (ADR-013)
+
+  hotel    Hotel         @relation(fields: [hotelId], references: [id])
+  guest    Guest         @relation(fields: [guestId], references: [id])
+  folio    Folio?        @relation(fields: [folioId], references: [id])
+  lines    InvoiceLine[]
+  payments Payment[]
+
+  @@index([hotelId, status])
+  @@index([guestId])
+}
+
+model InvoiceLine {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Int // minor units
+  amount      Int
+  taxRate     Decimal @default(0) @db.Decimal(10, 4)
+  accountCode String? // plan comptable
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum InvoiceType {
+  ROOM
+  RESTAURANT
+  SERVICE
+  CONSOLIDATED
+  CREDIT_NOTE
+  PRO_FORMA
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY // MTN MoMo, Orange Money, Moov
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+  POS_TERMINAL
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  REFUNDED
+  VOID
+}
+
+// ---------------------------------------------------------------------------
+//  PRODUITS, POS & STOCKS (aperçu cœur)
+// ---------------------------------------------------------------------------
+
+model Product {
+  id         String    @id @default(uuid())
+  hotelId    String
+  name       String
+  sku        String?
+  category   String // room, restaurant, service, transport, spa...
+  categoryId String?
+  unitId     String?
+  price      Int // prix de vente (minor units)
+  costPrice  Int?
+  currency   String
+  taxRate    Decimal   @default(0) @db.Decimal(10, 4)
+  trackStock Boolean   @default(false)
+  unit       String? // pièce, kg, litre
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime? // soft-delete (ADR-013)
+
+  hotel         Hotel               @relation(fields: [hotelId], references: [id])
+  categoryRef   StockCategory?      @relation(fields: [categoryId], references: [id])
+  unitRef       UnitOfMeasure?      @relation(fields: [unitId], references: [id])
+  stockItems    StockItem[]
+  posMenuLines  PosMenuLine[]
+  posOrderLines PosOrderLine[]
+  poLines       PurchaseOrderLine[]
+  receiptLines  StockReceiptLine[]
+  movements     StockMovement[]
+  countLines    StockCountLine[]
+
+  @@index([hotelId])
+}
+
+model StockItem {
+  id           String   @id @default(uuid())
+  hotelId      String
+  productId    String
+  warehouseId  String?
+  quantity     Decimal  @default(0) @db.Decimal(14, 3)
+  location     String? // dépôt, bar, cuisine
+  reorderLevel Decimal? @db.Decimal(14, 3)
+  minLevel     Decimal? @db.Decimal(14, 3) // seuil minimum (alerte réappro)
+  maxLevel     Decimal? @db.Decimal(14, 3) // seuil maximum
+  unitCost     Int? // coût unitaire courant (valorisation)
+  updatedAt    DateTime @updatedAt
+
+  hotel     Hotel      @relation(fields: [hotelId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  @@unique([productId, warehouseId, location])
+  @@index([hotelId])
+}
+
+// ---------------------------------------------------------------------------
+//  HOUSEKEEPING / MAINTENANCE / BLANCHISSERIE / TRANSPORT (cœur)
+// ---------------------------------------------------------------------------
+
+model HousekeepingTask {
+  id          String             @id @default(uuid())
+  hotelId     String
+  roomId      String
+  status      HousekeepingStatus
+  priority    Priority
+  assignedTo  String? // userId
+  scheduledAt DateTime?
+  notes       String?
+  // Horodatages des étapes (mesure des temps de nettoyage)
+  startedAt   DateTime? // début du nettoyage (IN_PROGRESS)
+  completedAt DateTime? // fin du nettoyage (COMPLETED)
+  verifiedAt  DateTime? // validation (VERIFIED)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  hotel  Hotel                   @relation(fields: [hotelId], references: [id])
+  room   Room                    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  events HousekeepingTaskEvent[]
+
+  @@index([hotelId, status])
+  @@index([assignedTo])
+}
+
+// Événement d'une tâche de ménage (création, changement de statut, affectation/réaffectation).
+model HousekeepingTaskEvent {
+  id        String   @id @default(uuid())
+  taskId    String
+  action    String // created | status_change | assigned | reassigned | ...
+  actor     String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  task HousekeepingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+// Statut d'un ticket de maintenance (Module 10).
+enum MaintenanceStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  ON_HOLD
+  RESOLVED
+  CLOSED
+}
+
+// Priorité d'un ticket de maintenance.
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Ticket de maintenance lié à une chambre (Module 10).
+model MaintenanceRequest {
+  id                String              @id @default(uuid())
+  hotelId           String
+  roomId            String?
+  title             String
+  description       String?
+  status            MaintenanceStatus   @default(OPEN)
+  priority          MaintenancePriority @default(MEDIUM)
+  assignedTo        String? // userId technicien
+  // Mise hors service automatique de la chambre pendant l'intervention
+  putRoomOutOfOrder Boolean             @default(false)
+  roomRestored      Boolean             @default(false) // chambre rendue réservable après clôture
+  // Horodatages
+  startedAt         DateTime?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  hotel  Hotel              @relation(fields: [hotelId], references: [id])
+  room   Room?              @relation(fields: [roomId], references: [id])
+  events MaintenanceEvent[]
+
+  @@index([hotelId, status])
+  @@index([roomId])
+}
+
+// Événement d'un ticket de maintenance (historique/audit).
+model MaintenanceEvent {
+  id        String   @id @default(uuid())
+  requestId String
+  action    String // created | assigned | status_change | room_out_of_order | room_restored | ...
+  actor     String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  request MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+// État du linge (Module 11 — Blanchisserie)
+enum LaundryState {
+  CLEAN // propre (stock)
+  DISTRIBUTED // distribué aux chambres
+  USED // utilisé (en service dans une chambre)
+  DIRTY // sale (à laver)
+  WASHING // en lavage
+  DRYING // en séchage
+  IRONING // en repassage
+}
+
+// Type de linge (Module 11)
+model LaundryItemType {
+  id        String    @id @default(uuid())
+  hotelId   String
+  name      String // ex: Serviette, Drap simple, Taie, Peignoir
+  unit      String? // pièce, kg
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft-delete
+
+  hotel Hotel         @relation(fields: [hotelId], references: [id])
+  items LaundryItem[]
+
+  @@index([hotelId])
+}
+
+// Pièce de linge physique (Module 11)
+model LaundryItem {
+  id         String       @id @default(uuid())
+  hotelId    String
+  itemTypeId String
+  code       String? // code RFID/QR/numéro
+  state      LaundryState @default(CLEAN)
+  roomId     String? // si distribué/utilisé
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime? // soft-delete (détérioré/perdu)
+
+  hotel        Hotel              @relation(fields: [hotelId], references: [id])
+  itemType     LaundryItemType    @relation(fields: [itemTypeId], references: [id])
+  room         Room?              @relation(fields: [roomId], references: [id])
+  batchEntries LaundryBatchItem[]
+  losses       LaundryLoss[]
+
+  @@index([hotelId, state])
+  @@index([itemTypeId])
+  @@index([roomId])
+}
+
+// Lot de lavage (Module 11)
+model LaundryBatch {
+  id           String    @id @default(uuid())
+  hotelId      String
+  code         String // ex: LB-2026-0001
+  mode         String // INTERNAL | EXTERNAL (prestataire)
+  providerName String? // si EXTERNAL
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  responsible  String? // userId
+  cost         Int? // minor units (coût éventuel)
+  currency     String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  hotel   Hotel              @relation(fields: [hotelId], references: [id])
+  entries LaundryBatchItem[]
+
+  @@index([hotelId, startedAt])
+}
+
+// Lignes d'un lot de lavage (pièces incluses)
+model LaundryBatchItem {
+  id        String   @id @default(uuid())
+  batchId   String
+  itemId    String
+  createdAt DateTime @default(now())
+
+  batch LaundryBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  item  LaundryItem  @relation(fields: [itemId], references: [id])
+
+  @@index([batchId])
+}
+
+// Perte / détérioration de linge (Module 11)
+model LaundryLoss {
+  id        String   @id @default(uuid())
+  hotelId   String
+  itemId    String
+  reason    String // LOST | DAMAGED
+  note      String?
+  costValue Int? // valeur estimée
+  createdAt DateTime @default(now())
+
+  hotel Hotel       @relation(fields: [hotelId], references: [id])
+  item  LaundryItem @relation(fields: [itemId], references: [id])
+
+  @@index([hotelId, createdAt])
+}
+
+// Statut d'une commande POS
+enum PosOrderStatus {
+  OPEN
+  PAID
+  VOID
+  REFUNDED
+  CANCELLED
+}
+
+// Point de vente (Module 13 — POS Restaurant)
+enum PosKind {
+  RESTAURANT
+  BAR
+  ROOM_SERVICE
+}
+
+// Point de vente (restaurant, bar, room service)
+model PosPoint {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String // ex: Restaurant Le Baobab, Bar, Room Service
+  kind      PosKind  @default(RESTAURANT)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel         Hotel          @relation(fields: [hotelId], references: [id])
+  menus         PosMenu[]
+  orders        PosOrder[]
+  cashRegisters CashRegister[]
+
+  @@index([hotelId])
+}
+
+// Menu (Module 13)
+model PosMenu {
+  id          String    @id @default(uuid())
+  hotelId     String
+  posPointId  String
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // soft-delete
+
+  hotel    Hotel         @relation(fields: [hotelId], references: [id])
+  posPoint PosPoint      @relation(fields: [posPointId], references: [id])
+  lines    PosMenuLine[]
+
+  @@index([hotelId])
+}
+
+// Ligne de menu (produit + prix + taxe)
+model PosMenuLine {
+  id        String  @id @default(uuid())
+  menuId    String
+  productId String
+  price     Int // minor units (prix de vente)
+  currency  String  @default("XOF")
+  taxRate   Decimal @default(0) @db.Decimal(10, 4)
+  isActive  Boolean @default(true)
+
+  menu    PosMenu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([menuId])
+}
+
+// Commande POS (Module 13)
+model PosOrder {
+  id             String         @id @default(uuid())
+  hotelId        String
+  posPointId     String
+  reservationId  String? // lien réservation / chambre
+  roomId         String? // pour room service
+  orderRef       String         @unique // ex: PO-2026-0001
+  status         PosOrderStatus @default(OPEN)
+  subtotal       Int            @default(0) // minor units
+  taxAmount      Int            @default(0)
+  discountAmount Int            @default(0)
+  total          Int            @default(0)
+  currency       String         @default("XOF")
+  createdBy      String? // userId
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  hotel         Hotel           @relation(fields: [hotelId], references: [id])
+  posPoint      PosPoint        @relation(fields: [posPointId], references: [id])
+  reservation   Reservation?    @relation(fields: [reservationId], references: [id])
+  room          Room?           @relation(fields: [roomId], references: [id])
+  lines         PosOrderLine[]
+  events        PosOrderEvent[]
+  payments      PosPayment[]
+  kitchenOrders KitchenOrder[]
+  tips          Tip[]
+
+  @@index([hotelId, status])
+  @@index([reservationId])
+  @@index([posPointId])
+}
+
+// Ligne de commande POS
+model PosOrderLine {
+  id          String  @id @default(uuid())
+  orderId     String
+  productId   String
+  productName String // snapshot du nom au moment de la vente
+  quantity    Int     @default(1)
+  unitPrice   Int // prix unitaire (minor units)
+  lineTotal   Int
+  taxRate     Decimal @default(0) @db.Decimal(10, 4)
+
+  order   PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+// Événement d'une commande POS (traçabilité remboursements/annulations/modifications)
+model PosOrderEvent {
+  id        String   @id @default(uuid())
+  orderId   String
+  action    String // created | line_added | line_modified | payment | void | refund | cancelled
+  actor     String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  order PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// Paiement POS (Module 13)
+model PosPayment {
+  id         String        @id @default(uuid())
+  hotelId    String
+  orderId    String
+  amount     Int // minor units
+  method     PaymentMethod // CASH, CARD, MOBILE_MONEY, ...
+  status     PaymentStatus @default(PAID)
+  reference  String?
+  receivedBy String?
+  createdAt  DateTime      @default(now())
+
+  hotel Hotel    @relation(fields: [hotelId], references: [id])
+  order PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tips  Tip[]
+
+  @@index([orderId])
+}
+
+// Statut d'une session de caisse (Module 15 — Caisse)
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+// Type de mouvement de caisse (Module 15)
+enum CashMovementType {
+  OPENING // fonds d'ouverture
+  SALE // encaissement de vente
+  PAYMENT // encaissement (folio client)
+  REFUND // remboursement
+  VOID // annulation
+  EXPENSE // dépense
+  CLOSING // versement de clôture
+  RECONCILIATION // ajustement de réconciliation
+}
+
+// Caisse (tiroir) d'un hôtel (Module 15)
+model CashRegister {
+  id         String   @id @default(uuid())
+  hotelId    String
+  name       String // ex: Caisse réception, Caisse restaurant
+  posPointId String? // caisse liée à un point de vente (optionnel)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  hotel    Hotel         @relation(fields: [hotelId], references: [id])
+  posPoint PosPoint?     @relation(fields: [posPointId], references: [id])
+  sessions CashSession[]
+
+  @@index([hotelId])
+}
+
+// Session de caisse (ouverture/fermeture) (Module 15)
+model CashSession {
+  id            String            @id @default(uuid())
+  hotelId       String
+  registerId    String
+  cashierId     String? // userId (caissier)
+  status        CashSessionStatus @default(OPEN)
+  openedAt      DateTime          @default(now())
+  closedAt      DateTime?
+  openingAmount Int               @default(0) // fonds d'ouverture (minor units)
+  closingAmount Int? // total théorique à la clôture
+  countedAmount Int? // total compté (réconciliation)
+  difference    Int? // écart counted - closing
+  note          String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  hotel     Hotel          @relation(fields: [hotelId], references: [id])
+  register  CashRegister   @relation(fields: [registerId], references: [id])
+  movements CashMovement[]
+
+  @@index([hotelId, status])
+  @@index([registerId])
+}
+
+// Mouvement de caisse (Module 15)
+model CashMovement {
+  id        String           @id @default(uuid())
+  hotelId   String
+  sessionId String
+  type      CashMovementType
+  method    PaymentMethod
+  amount    Int // minor units (signe par le type)
+  reference String? // ex: id de commande POS / facture
+  note      String?
+  createdBy String?
+  createdAt DateTime         @default(now())
+
+  hotel   Hotel       @relation(fields: [hotelId], references: [id])
+  session CashSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([hotelId, createdAt])
+}
+
+// Statut d'un ordre de préparation cuisine (Module 14 — Kitchen Display System)
+enum KitchenOrderStatus {
+  NEW
+  PREPARING
+  READY
+  SERVED
+  MODIFIED
+  CANCELLED
+}
+
+// Poste de cuisine (Module 14)
+model KitchenStation {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String // ex: Grillard, Froid, Plats, Desserts
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel  Hotel          @relation(fields: [hotelId], references: [id])
+  orders KitchenOrder[]
+
+  @@index([hotelId])
+}
+
+// Ordre de préparation (Module 14) — intégré au POS restaurant
+model KitchenOrder {
+  id            String             @id @default(uuid())
+  hotelId       String
+  posOrderId    String // commande POS d'origine
+  stationId     String
+  kitchenRef    String             @unique // ex: KO-2026-0001
+  status        KitchenOrderStatus @default(NEW)
+  priority      Priority           @default(MEDIUM)
+  notes         String?
+  // Lien contextuel
+  posPointId    String?
+  reservationId String?
+  roomId        String? // room service
+  // Horodatages du cycle
+  receivedAt    DateTime           @default(now())
+  startedAt     DateTime?
+  readyAt       DateTime?
+  servedAt      DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  hotel    Hotel               @relation(fields: [hotelId], references: [id])
+  posOrder PosOrder            @relation(fields: [posOrderId], references: [id])
+  station  KitchenStation      @relation(fields: [stationId], references: [id])
+  lines    KitchenOrderLine[]
+  events   KitchenOrderEvent[]
+
+  @@index([hotelId, status])
+  @@index([stationId, status])
+  @@index([posOrderId])
+}
+
+// Ligne d'un ordre de préparation
+model KitchenOrderLine {
+  id             String            @id @default(uuid())
+  kitchenOrderId String
+  productId      String
+  productName    String
+  quantity       Int               @default(1)
+  note           String?
+  status         KitchenLineStatus @default(NEW)
+
+  kitchenOrder KitchenOrder @relation(fields: [kitchenOrderId], references: [id], onDelete: Cascade)
+
+  @@index([kitchenOrderId])
+}
+
+enum KitchenLineStatus {
+  NEW
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+// Événement d'un ordre de cuisine (traçabilité / temps réel)
+model KitchenOrderEvent {
+  id             String   @id @default(uuid())
+  kitchenOrderId String
+  action         String // received | station_assigned | started | ready | served | modified | cancelled
+  actor          String?
+  detail         String?
+  createdAt      DateTime @default(now())
+
+  kitchenOrder KitchenOrder @relation(fields: [kitchenOrderId], references: [id], onDelete: Cascade)
+
+  @@index([kitchenOrderId])
+}
+
+// Nature d'un pourboire (Module 16)
+enum TipType {
+  INDIVIDUAL // pourboire individuel à un membre du personnel
+  COLLECTIVE // pourboire collectif à répartir (pool)
+}
+
+// Statut d'un pourboire (Module 16)
+enum TipStatus {
+  PENDING // en attente de validation
+  VALIDATED // validé par un responsable
+  DISTRIBUTED // distribué
+  CANCELLED // annulé
+}
+
+// Règle de répartition d'un pourboire collectif (Module 16) — configurable par hôtel
+model TipRule {
+  id             String   @id @default(uuid())
+  hotelId        String
+  name           String // ex: "Serveur 60 / Équipe 30 / Cuisine 10"
+  isActive       Boolean  @default(true)
+  // Répartition en % : serveur / team / kitchen / other (somme = 100)
+  serverPercent  Int      @default(60)
+  teamPercent    Int      @default(30)
+  kitchenPercent Int      @default(10)
+  otherPercent   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+  tips  Tip[]
+
+  @@index([hotelId])
+}
+
+// Pourboire (Module 16) — enregistré lors d'un paiement POS
+model Tip {
+  id            String        @id @default(uuid())
+  hotelId       String
+  posPaymentId  String? // paiement POS associé
+  posOrderId    String? // commande POS associée
+  type          TipType
+  status        TipStatus     @default(PENDING)
+  amount        Int // minor units
+  method        PaymentMethod // CASH, CARD, MOBILE_MONEY, ...
+  tipRuleId     String? // règle appliquée (si collectif)
+  validatedBy   String? // userId responsable
+  validatedAt   DateTime?
+  distributedAt DateTime?
+  cancelledBy   String?
+  cancelledAt   DateTime?
+  note          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  hotel       Hotel           @relation(fields: [hotelId], references: [id])
+  posPayment  PosPayment?     @relation(fields: [posPaymentId], references: [id])
+  posOrder    PosOrder?       @relation(fields: [posOrderId], references: [id])
+  tipRule     TipRule?        @relation(fields: [tipRuleId], references: [id])
+  allocations TipAllocation[]
+  events      TipEvent[]
+
+  @@index([hotelId, status])
+  @@index([posPaymentId])
+}
+
+// Répartition d'un pourboire vers un bénéficiaire (Module 16)
+model TipAllocation {
+  id        String   @id @default(uuid())
+  tipId     String
+  recipient String // userId ou "team"/"kitchen"
+  amount    Int // montant alloué (minor units)
+  createdAt DateTime @default(now())
+
+  tip Tip @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  @@index([tipId])
+}
+
+// Événement d'un pourboire (historique / traçabilité)
+model TipEvent {
+  id        String   @id @default(uuid())
+  tipId     String
+  action    String // created | validated | distributed | cancelled | corrected
+  actor     String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  tip Tip @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  @@index([tipId])
+}
+
+// Type de remise (Module 17)
+enum DiscountType {
+  PERCENT // pourcentage
+  FIXED // montant fixe
+}
+
+// Portée d'une remise (Module 17)
+enum DiscountScope {
+  POS // point de vente / commande
+  RESERVATION // réservation hôtelière
+  BILLING // facturation / folio
+}
+
+// Statut d'un coupon (Module 17)
+enum CouponStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+// Règle de remise (Module 17) — moteur flexible
+model DiscountRule {
+  id         String        @id @default(uuid())
+  hotelId    String
+  name       String
+  code       String? // code machine (ex: PROMO10)
+  type       DiscountType
+  value      Int // % (0-100) ou montant fixe en minor units
+  scope      DiscountScope @default(POS)
+  // Plafond par rôle (code rôle → montant max minor units) — null = aucun plafond
+  roleCap    Int?
+  // Conditions (JSON flexible)
+  conditions Json? // { dateFrom, dateTo, channels[], guestTypes[], roomTypeIds[], minAmount, maxAmount }
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  deletedAt  DateTime?
+
+  hotel   Hotel    @relation(fields: [hotelId], references: [id])
+  coupons Coupon[]
+
+  @@index([hotelId, isActive])
+}
+
+// Coupon (Module 17) — généré depuis une règle
+model Coupon {
+  id        String       @id @default(uuid())
+  hotelId   String
+  ruleId    String
+  code      String       @unique // ex: PROMO10-AB12
+  status    CouponStatus @default(ACTIVE)
+  singleUse Boolean      @default(false)
+  usedBy    String? // référence (orderId, reservationId)
+  usedAt    DateTime?
+  expiresAt DateTime?
+  issuedTo  String? // guestId si émis à un client
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  hotel Hotel        @relation(fields: [hotelId], references: [id])
+  rule  DiscountRule @relation(fields: [ruleId], references: [id])
+
+  @@index([hotelId, status])
+  @@index([code])
+}
+
+// Type de mouvement de stock (Module 18)
+enum StockMovementType {
+  RECEIPT // entrée (réception)
+  ISSUE // sortie (consommation)
+  TRANSFER // transfert entre entrepôts
+  ADJUSTMENT // ajustement (correction)
+  RETURN // retour fournisseur
+  LOSS // perte
+  BREAKAGE // casse
+  PRODUCTION // production (cuisine)
+}
+
+// Catégorie d'article (Module 18)
+model StockCategory {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel    Hotel     @relation(fields: [hotelId], references: [id])
+  products Product[]
+
+  @@index([hotelId])
+}
+
+// Fournisseur (Module 18)
+model Supplier {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String
+  contact   String?
+  phone     String?
+  email     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel    Hotel           @relation(fields: [hotelId], references: [id])
+  orders   PurchaseOrder[]
+  receipts StockReceipt[]
+
+  @@index([hotelId])
+}
+
+// Unité de mesure (Module 18)
+model UnitOfMeasure {
+  id           String   @id @default(uuid())
+  hotelId      String
+  name         String // kg, litre, pièce, boîte
+  abbreviation String
+  createdAt    DateTime @default(now())
+
+  hotel    Hotel     @relation(fields: [hotelId], references: [id])
+  products Product[]
+
+  @@index([hotelId])
+}
+
+// Entreposage / stock (Module 18) — enrichit StockItem existant
+model Warehouse {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String // dépôt principal, cuisine, bar
+  location  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel        Hotel              @relation(fields: [hotelId], references: [id])
+  stockItems   StockItem[]
+  movements    StockMovement[]
+  receiptLines StockReceiptLine[]
+  stockCounts  StockCount[]
+
+  @@index([hotelId])
+}
+
+// Commande fournisseur (Module 18)
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id           String              @id @default(uuid())
+  hotelId      String
+  supplierId   String
+  poRef        String              @unique // ex: PO-2026-0001
+  status       PurchaseOrderStatus @default(DRAFT)
+  orderedAt    DateTime?
+  expectedDate DateTime?
+  receivedAt   DateTime?
+  createdBy    String?
+  totalAmount  Int                 @default(0)
+  currency     String              @default("XOF")
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  hotel    Hotel               @relation(fields: [hotelId], references: [id])
+  supplier Supplier            @relation(fields: [supplierId], references: [id])
+  lines    PurchaseOrderLine[]
+  receipts StockReceipt[]
+
+  @@index([hotelId, status])
+}
+
+// Ligne de commande fournisseur (Module 18)
+model PurchaseOrderLine {
+  id              String  @id @default(uuid())
+  purchaseOrderId String
+  productId       String
+  quantity        Decimal @db.Decimal(14, 3)
+  unitPrice       Int // minor units
+  amount          Int
+  receivedQty     Decimal @default(0) @db.Decimal(14, 3)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([purchaseOrderId])
+}
+
+// Réception de livraison (Module 18)
+model StockReceipt {
+  id              String   @id @default(uuid())
+  hotelId         String
+  purchaseOrderId String?
+  supplierId      String?
+  receiptRef      String   @unique
+  receivedAt      DateTime @default(now())
+  receivedBy      String?
+  note            String?
+  createdAt       DateTime @default(now())
+
+  hotel         Hotel              @relation(fields: [hotelId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  supplier      Supplier?          @relation(fields: [supplierId], references: [id])
+  lines         StockReceiptLine[]
+
+  @@index([hotelId])
+}
+
+// Ligne de réception (Module 18)
+model StockReceiptLine {
+  id          String  @id @default(uuid())
+  receiptId   String
+  productId   String
+  quantity    Decimal @db.Decimal(14, 3)
+  unitPrice   Int // minor units
+  warehouseId String?
+
+  receipt   StockReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product   Product      @relation(fields: [productId], references: [id])
+  warehouse Warehouse?   @relation(fields: [warehouseId], references: [id])
+
+  @@index([receiptId])
+}
+
+// Mouvement de stock (Module 18)
+model StockMovement {
+  id          String            @id @default(uuid())
+  hotelId     String
+  productId   String
+  warehouseId String?
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(14, 3) // signe selon le type (entrée +, sortie -)
+  unitCost    Int? // coût unitaire pour valorisation
+  reference   String? // id commande POS / ordre cuisine / bon
+  note        String?
+  createdBy   String?
+  createdAt   DateTime          @default(now())
+
+  hotel     Hotel      @relation(fields: [hotelId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id])
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  @@index([hotelId, createdAt])
+  @@index([productId])
+}
+
+// Inventaire physique (Module 18)
+enum StockCountStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  ADJUSTED
+}
+
+model StockCount {
+  id          String           @id @default(uuid())
+  hotelId     String
+  warehouseId String?
+  countRef    String           @unique
+  status      StockCountStatus @default(DRAFT)
+  countedBy   String?
+  countedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  hotel     Hotel            @relation(fields: [hotelId], references: [id])
+  warehouse Warehouse?       @relation(fields: [warehouseId], references: [id])
+  lines     StockCountLine[]
+
+  @@index([hotelId, status])
+}
+
+// Ligne d'inventaire (Module 18)
+model StockCountLine {
+  id             String  @id @default(uuid())
+  stockCountId   String
+  productId      String
+  theoreticalQty Decimal @db.Decimal(14, 3)
+  countedQty     Decimal @db.Decimal(14, 3)
+  difference     Decimal @db.Decimal(14, 3)
+  adjusted       Boolean @default(false)
+
+  stockCount StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@index([stockCountId])
+}
+
+// Nature d'un compte comptable (Module 19)
+enum AccountNature {
+  DEBIT // compte de débit
+  CREDIT // compte de crédit
+}
+
+// Type de compte (Module 19)
+enum AccountType {
+  ASSET // actif (classe 2)
+  LIABILITY // passif (classe 1/4)
+  EQUITY // capitaux propres (classe 1)
+  REVENUE // produits (classe 7)
+  EXPENSE // charges (classe 6)
+  OTHER // hors bilan / divers
+}
+
+// Journal comptable (Module 19)
+enum AccountingJournalType {
+  SALES // ventes
+  PURCHASES // achats
+  BANK // banque
+  CASH // caisse
+  GENERAL // opérations diverses (OD)
+}
+
+// Statut d'une écriture comptable (Module 19)
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+// Période comptable (Module 19)
+model AccountingPeriod {
+  id        String   @id @default(uuid())
+  hotelId   String
+  label     String // ex: "Exercice 2026 - Janvier"
+  startDate DateTime
+  endDate   DateTime
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  hotel    Hotel            @relation(fields: [hotelId], references: [id])
+  entries  JournalEntry[]
+  balances AccountBalance[]
+
+  @@index([hotelId])
+}
+
+// Plan comptable (Module 19) — SYSCOHADA révisé par configuration
+model Account {
+  id        String        @id @default(uuid())
+  hotelId   String
+  code      String // ex: 601100 (achats matières), 411000 (clients)
+  name      String
+  type      AccountType
+  nature    AccountNature
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  hotel    Hotel              @relation(fields: [hotelId], references: [id])
+  lines    JournalEntryLine[]
+  balances AccountBalance[]
+
+  @@index([hotelId, code])
+}
+
+// Centre de coûts (Module 19)
+model CostCenter {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String // ex: Restaurant, Hébergement, SPA
+  code      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  hotel Hotel              @relation(fields: [hotelId], references: [id])
+  lines JournalEntryLine[]
+
+  @@index([hotelId])
+}
+
+// Journal comptable (Module 19)
+model AccountingJournal {
+  id        String                @id @default(uuid())
+  hotelId   String
+  name      String // Ventes, Achats, Banque, Caisse, OD
+  type      AccountingJournalType
+  isActive  Boolean               @default(true)
+  createdAt DateTime              @default(now())
+
+  hotel   Hotel          @relation(fields: [hotelId], references: [id])
+  entries JournalEntry[]
+
+  @@index([hotelId])
+}
+
+// Écriture comptable (Module 19)
+model JournalEntry {
+  id        String             @id @default(uuid())
+  hotelId   String
+  journalId String
+  periodId  String?
+  entryDate DateTime
+  reference String // ex: FAC-2026-0001, PO-2026-0001
+  label     String
+  status    JournalEntryStatus @default(DRAFT)
+  postedAt  DateTime?
+  createdBy String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  hotel   Hotel              @relation(fields: [hotelId], references: [id])
+  journal AccountingJournal  @relation(fields: [journalId], references: [id])
+  period  AccountingPeriod?  @relation(fields: [periodId], references: [id])
+  lines   JournalEntryLine[]
+
+  @@index([hotelId, entryDate])
+}
+
+// Ligne d'écriture comptable (Module 19)
+model JournalEntryLine {
+  id           String  @id @default(uuid())
+  entryId      String
+  accountId    String
+  costCenterId String?
+  debit        Int     @default(0) // minor units
+  credit       Int     @default(0)
+
+  entry      JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account    Account      @relation(fields: [accountId], references: [id])
+  costCenter CostCenter?  @relation(fields: [costCenterId], references: [id])
+
+  @@index([entryId])
+  @@index([accountId])
+}
+
+// Solde d'un compte sur une période (Module 19)
+model AccountBalance {
+  id        String @id @default(uuid())
+  hotelId   String
+  accountId String
+  periodId  String
+  debit     Int    @default(0)
+  credit    Int    @default(0)
+
+  hotel   Hotel            @relation(fields: [hotelId], references: [id])
+  account Account          @relation(fields: [accountId], references: [id])
+  period  AccountingPeriod @relation(fields: [periodId], references: [id])
+
+  @@unique([accountId, periodId])
+}
+
+// Rapprochement bancaire (Module 19)
+model BankReconciliation {
+  id            String   @id @default(uuid())
+  hotelId       String
+  bankAccount   String
+  statementDate DateTime
+  ledgerBalance Int // solde comptable
+  bankBalance   Int // solde bancaire
+  difference    Int
+  isReconciled  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId])
+}
+
+// Type de frais de folio (Module 20)
+enum FolioChargeType {
+  ROOM // hébergement
+  RESTAURANT // restauration
+  ROOM_SERVICE // room service
+  LAUNDRY // blanchisserie
+  TRANSPORT // transport
+  MAINTENANCE // maintenance facturable
+  MINIBAR // minibar
+  OTHER // autres
+}
+
+// Statut d'un folio (Module 20)
+enum FolioStatus {
+  OPEN
+  CLOSED
+}
+
+// Folio client (Module 20) — centralise tous les frais d'un séjour
+model Folio {
+  id            String      @id @default(uuid())
+  hotelId       String
+  reservationId String? // séjour principal
+  guestId       String
+  folioRef      String      @unique // ex: FL-2026-0001
+  name          String? // ex: "Chambre 101", "Groupe CONF"
+  status        FolioStatus @default(OPEN)
+  // regroupement (individuel / groupe / entreprise)
+  groupRef      String? // identifiant de groupe/entreprise
+  currency      String      @default("XOF")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  hotel       Hotel        @relation(fields: [hotelId], references: [id])
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+  guest       Guest        @relation(fields: [guestId], references: [id])
+  lines       FolioLine[]
+  payments    Payment[]
+  invoices    Invoice[]
+
+  @@index([hotelId, status])
+  @@index([guestId])
+  @@index([groupRef])
+}
+
+// Ligne de frais d'un folio (Module 20)
+model FolioLine {
+  id          String          @id @default(uuid())
+  folioId     String
+  chargeType  FolioChargeType
+  description String
+  quantity    Int             @default(1)
+  unitPrice   Int // minor units
+  amount      Int // unitPrice * quantity
+  taxRate     Decimal         @default(0) @db.Decimal(10, 4)
+  sourceRef   String? // référence source (commande POS, transfert, etc.)
+  postedAt    DateTime        @default(now())
+  voided      Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  folio Folio @relation(fields: [folioId], references: [id], onDelete: Cascade)
+
+  @@index([folioId])
+}
+
+// Paiement (Module 20) — enrichi pour folios/multi-moyens/différé
+model PaymentGateway {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String // Stripe, Flutterwave, Paystack, MTN MoMo...
+  provider  String // identifiant passerelle (configurable)
+  isActive  Boolean  @default(true)
+  config    Json? // clés de configuration (sandbox/live)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel    Hotel     @relation(fields: [hotelId], references: [id])
+  payments Payment[]
+
+  @@index([hotelId])
+}
+
+// Surcharge de Payment : ajout folioId + gatewayRef + type de paiement
+model Payment {
+  id            String        @id @default(uuid())
+  hotelId       String
+  folioId       String?
+  reservationId String?
+  invoiceId     String?
+  guestId       String?
+  amount        Int
+  currency      String
+  method        PaymentMethod
+  status        PaymentStatus
+  reference     String? // transaction ref (momo, carte)
+  // paiements partiels / acomptes / cautions / différés
+  kind          String? // PARTIAL, DEPOSIT, CAUTION, FULL, DEFERRED
+  gatewayId     String? // passerelle utilisée
+  gatewayRef    String? // référence passerelle
+  receivedAt    DateTime?
+  createdBy     String?
+  createdAt     DateTime      @default(now())
+
+  hotel       Hotel           @relation(fields: [hotelId], references: [id])
+  folio       Folio?          @relation(fields: [folioId], references: [id])
+  reservation Reservation?    @relation(fields: [reservationId], references: [id])
+  invoice     Invoice?        @relation(fields: [invoiceId], references: [id])
+  gateway     PaymentGateway? @relation(fields: [gatewayId], references: [id])
+
+  @@index([hotelId, createdAt])
+  @@index([invoiceId])
+  @@index([folioId])
+}
+
+// Canal d'une campagne (Module 21 — CRM)
+enum CampaignChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+  OTHER
+}
+
+// Statut d'une campagne (Module 21)
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  PARTIALLY_SENT
+  CANCELLED
+}
+
+// Entreprise / agence partenaire (Module 21)
+model Company {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String
+  type      String // CORPORATE, AGENCY, TRAVEL_AGENT, TOUR_OPERATOR
+  contact   String?
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel         Hotel         @relation(fields: [hotelId], references: [id])
+  guests        Guest[]
+  opportunities Opportunity[]
+  EventGroup    EventGroup[]
+
+  @@index([hotelId])
+}
+
+// Préférences client (Module 21) — extensible, sans logique en dur
+model GuestPreference {
+  id                    String    @id @default(uuid())
+  hotelId               String
+  guestId               String
+  language              String? // langue préférée
+  roomTypeId            String? // type de chambre préféré
+  floor                 String? // étage préféré
+  view                  String? // vue préférée
+  bedType               String? // type de lit
+  diet                  String? // régime alimentaire
+  allergies             String[] // allergies
+  favoritePaymentMethod String? // moyen de paiement favori
+  birthDate             DateTime? // anniversaire
+  communicationPrefs    Json? // préférences de communication (canaux, fréquence)
+  custom                Json? // autres préférences (extensible)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+  guest Guest @relation(fields: [guestId], references: [id])
+
+  @@index([guestId])
+}
+
+// Segment de clientèle (Module 21) — règles configurables
+model CustomerSegment {
+  id          String   @id @default(uuid())
+  hotelId     String
+  name        String // ex: "Fidèles VIP", "Forte dépense"
+  description String?
+  criteria    Json? // règles dynamiques : fréquence, CA, durée, pays, ville, entreprise, canal, chambre, préférences, VIP, fidélité
+  isDynamic   Boolean  @default(true) // segment dynamique (recalculé)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  hotel     Hotel      @relation(fields: [hotelId], references: [id])
+  campaigns Campaign[]
+
+  @@index([hotelId])
+}
+
+// Campagne marketing (Module 21)
+model Campaign {
+  id              String          @id @default(uuid())
+  hotelId         String
+  segmentId       String?
+  name            String
+  channel         CampaignChannel
+  subject         String?
+  messageTemplate String
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  status          CampaignStatus  @default(DRAFT)
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  hotel   Hotel            @relation(fields: [hotelId], references: [id])
+  segment CustomerSegment? @relation(fields: [segmentId], references: [id])
+  sends   CampaignSend[]
+
+  @@index([hotelId, status])
+}
+
+// Envoi d'une campagne à un client + suivi ouvertures/clics
+model CampaignSend {
+  id         String    @id @default(uuid())
+  hotelId    String
+  campaignId String
+  guestId    String
+  sentAt     DateTime  @default(now())
+  openedAt   DateTime?
+  clickedAt  DateTime?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  guest    Guest    @relation(fields: [guestId], references: [id])
+  hotel    Hotel    @relation(fields: [hotelId], references: [id])
+
+  @@index([campaignId])
+}
+
+// Interaction client (Module 21) — vue 360 / historique complet
+model CustomerInteraction {
+  id           String   @id @default(uuid())
+  hotelId      String
+  guestId      String
+  type         String // reservation, stay, payment, request, incident, complaint, preference, campaign, call, email
+  summary      String
+  detail       Json? // données contextuelles
+  sourceModule String? // module d'origine (reservations, pos, billing...)
+  createdAt    DateTime @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+  guest Guest @relation(fields: [guestId], references: [id])
+
+  @@index([guestId, createdAt])
+  @@index([hotelId, createdAt])
+}
+
+// Note interne / tâche / rappel (Module 21)
+model CustomerTask {
+  id         String    @id @default(uuid())
+  hotelId    String
+  guestId    String
+  kind       String // NOTE, TASK, REMINDER
+  title      String
+  body       String?
+  dueAt      DateTime?
+  done       Boolean   @default(false)
+  assignedTo String? // userId
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+  guest Guest @relation(fields: [guestId], references: [id])
+
+  @@index([guestId])
+}
+
+// Opportunité de vente (Module 21)
+model Opportunity {
+  id           String    @id @default(uuid())
+  hotelId      String
+  guestId      String?
+  companyId    String?
+  title        String
+  value        Int? // valeur estimée (minor units)
+  stage        String // PROSPECT, QUOTED, WON, LOST
+  expectedDate DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  hotel   Hotel    @relation(fields: [hotelId], references: [id])
+  guest   Guest?   @relation(fields: [guestId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([hotelId])
+}
+
+// Propriété d'un véhicule (Module 12 — Transport)
+enum VehicleOwnership {
+  INTERNAL // véhicule de l'hôtel
+  EXTERNAL // prestataire externe
+}
+
+// Statut d'un véhicule
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+// Véhicule (Module 12)
+model Vehicle {
+  id           String           @id @default(uuid())
+  hotelId      String
+  name         String // ex: Van 8 places
+  plate        String           @unique // plaque
+  capacity     Int              @default(4)
+  ownership    VehicleOwnership @default(INTERNAL)
+  providerName String? // si EXTERNAL
+  status       VehicleStatus    @default(AVAILABLE)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime? // soft-delete
+
+  hotel       Hotel                @relation(fields: [hotelId], references: [id])
+  assignments TransferAssignment[]
+
+  @@index([hotelId, status])
+}
+
+// Chauffeur (Module 12)
+model Driver {
+  id        String   @id @default(uuid())
+  hotelId   String
+  firstName String
+  lastName  String
+  phone     String?
+  licenseNo String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel       Hotel                @relation(fields: [hotelId], references: [id])
+  assignments TransferAssignment[]
+
+  @@index([hotelId])
+}
+
+// Statut d'une réservation de transfert (Module 12)
+enum TransferStatus {
+  REQUESTED
+  CONFIRMED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Type de trajet (Module 12)
+enum TransferType {
+  AIRPORT
+  STATION
+  CITY
+  CUSTOM
+  ROUND_TRIP // aller-retour
+  MULTI_STOP // multi-destination
+}
+
+// Réservation de transfert (Module 12)
+model Transfer {
+  id                    String         @id @default(uuid())
+  hotelId               String
+  guestId               String? // lien profil client
+  reservationId         String? // lien réservation hôtelière (synchro check-in/out)
+  transferRef           String         @unique // ex: TR-2026-0001
+  type                  TransferType   @default(AIRPORT)
+  status                TransferStatus @default(REQUESTED)
+  pickupLocation        String
+  dropoffLocation       String
+  scheduledAt           DateTime
+  paxCount              Int            @default(1)
+  notes                 String?
+  // Facturation vers le folio
+  amount                Int            @default(0) // minor units
+  currency              String?        @default("XOF")
+  invoicedToReservation Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  deletedAt             DateTime? // soft-delete
+
+  hotel       Hotel                @relation(fields: [hotelId], references: [id])
+  guest       Guest?               @relation(fields: [guestId], references: [id])
+  reservation Reservation?         @relation(fields: [reservationId], references: [id])
+  assignments TransferAssignment[]
+
+  @@index([hotelId, status])
+  @@index([scheduledAt])
+  @@index([reservationId])
+}
+
+// Affectation véhicule + chauffeur à un transfert (Module 12)
+model TransferAssignment {
+  id         String   @id @default(uuid())
+  transferId String
+  vehicleId  String
+  driverId   String
+  assignedAt DateTime @default(now())
+  createdBy  String?
+
+  transfer Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id])
+  driver   Driver   @relation(fields: [driverId], references: [id])
+
+  @@index([transferId])
+  @@index([vehicleId])
+  @@index([driverId])
+}
+
+enum HousekeepingStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ---------------------------------------------------------------------------
+//  NOTIFICATIONS MULTICANALES (Module 23)
+//  Système centralisé, agnostique fournisseur (provider-agnostic) : chaque
+//  hôtel configure ses propres fournisseurs, clés, expéditeurs, domaines,
+//  modèles multilingues et règles d'utilisation.
+// ---------------------------------------------------------------------------
+
+// Canal de notification.
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+  PUSH
+  VOICE
+  IN_APP
+  OTHER
+}
+
+// Statut de traitement / livraison d'un envoi (le fournisseur peut enrichir
+// jusqu'à SENT/DELIVERED/READ/CLICKED, sinon on s'arrête à SENT).
+enum NotificationStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  READ
+  CLICKED
+  FAILED
+  CANCELLED
+}
+
+// Type de fournisseur (channel ciblé).
+enum NotificationProviderType {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+  VOICE
+  OTHER
+}
+
+// Type de déclencheur / événement métier.
+enum NotificationEventType {
+  RESERVATION_CONFIRMED
+  RESERVATION_CANCELLED
+  RESERVATION_CREATED
+  CHECK_IN
+  CHECK_OUT
+  NO_SHOW
+  PAYMENT_RECEIVED
+  INVOICE_PAID
+  PROMOTION
+  LOYALTY_POINTS
+  LOYALTY_TIER
+  HOUSEKEEPING
+  MAINTENANCE
+  TRANSPORT
+  LAUNDRY
+  WELCOME
+  CUSTOM
+}
+
+// Priorité d'envoi (ordre dans la file).
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Fournisseur de notification configurable par hôtel (provider-agnostic).
+model NotificationProvider {
+  id                 String                   @id @default(uuid())
+  hotelId            String
+  name               String // ex: "Resend", "Twilio", "Meta WhatsApp", "FCM"
+  channel            NotificationChannel
+  providerType       NotificationProviderType
+  providerKey        String // clé métier (ex: "resend", "twilio", "meta", "fcm")
+  credentials        Json? // clés API / secrets (chiffrables)
+  config             Json? // options provider (région, accountSid, ...)
+  fromAddress        String? // expéditeur (email) / numéro / expéditeur WhatsApp
+  domain             String? // domaine d'envoi (email)
+  replyTo            String?
+  isDefault          Boolean                  @default(false)
+  isActive           Boolean                  @default(true)
+  rateLimitPerMinute Int                      @default(0) // 0 = illimité
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  hotel            Hotel              @relation(fields: [hotelId], references: [id])
+  NotificationSend NotificationSend[]
+
+  @@index([hotelId, channel])
+  @@index([hotelId, isActive])
+}
+
+// Template de message multilingue avec variables dynamiques.
+model NotificationTemplate {
+  id        String                @id @default(uuid())
+  hotelId   String
+  channel   NotificationChannel
+  eventType NotificationEventType
+  code      String // code métier du template (ex: "booking_confirmation")
+  locale    String                @default("fr")
+  subject   String? // pour email
+  body      String // corps du message (placeholders {{var}})
+  variables String[] // liste des variables attendues
+  isActive  Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@unique([hotelId, channel, code, locale])
+  @@index([hotelId, eventType])
+}
+
+// Règle de déclenchement automatique.
+model NotificationTrigger {
+  id           String                @id @default(uuid())
+  hotelId      String
+  eventType    NotificationEventType
+  channel      NotificationChannel
+  templateCode String
+  condition    Json? // condition d'activation (ex: réservation confirmée, montant...)
+  priority     NotificationPriority  @default(NORMAL)
+  isActive     Boolean               @default(true)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, eventType, isActive])
+}
+
+// Campagne de notifications programmée.
+model NotificationCampaign {
+  id           String              @id @default(uuid())
+  hotelId      String
+  name         String
+  channel      NotificationChannel
+  templateCode String
+  segmentId    String? // cible (segment CRM) optionnelle
+  audience     Json? // liste explicite de destinataires ou critères
+  scheduleAt   DateTime?
+  status       String              @default("DRAFT") // DRAFT | SCHEDULED | SENDING | SENT | CANCELLED
+  sentAt       DateTime?
+  config       Json?
+  createdBy    String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  hotel            Hotel              @relation(fields: [hotelId], references: [id])
+  NotificationSend NotificationSend[]
+
+  @@index([hotelId, status])
+}
+
+// Envoi de notification (historique complet + suivi de statut).
+model NotificationSend {
+  id             String                 @id @default(uuid())
+  hotelId        String
+  notificationId String? // ref vers la table Notification (compat)
+  campaignId     String?
+  channel        NotificationChannel
+  eventType      NotificationEventType?
+  templateCode   String?
+  providerId     String?
+  recipientType  String // guest, staff
+  recipientId    String
+  recipient      String? // email / téléphone / device token
+  subject        String?
+  body           String?
+  status         NotificationStatus     @default(QUEUED)
+  priority       NotificationPriority   @default(NORMAL)
+  attempts       Int                    @default(0)
+  maxAttempts    Int                    @default(3)
+  nextRetryAt    DateTime?
+  providerRef    String? // id fournisseur (message id)
+  error          String?
+  payload        Json?
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  hotel    Hotel                 @relation(fields: [hotelId], references: [id])
+  provider NotificationProvider? @relation(fields: [providerId], references: [id])
+  campaign NotificationCampaign? @relation(fields: [campaignId], references: [id])
+
+  @@index([hotelId, status])
+  @@index([hotelId, status, nextRetryAt])
+  @@index([campaignId])
+  @@index([recipientId])
+}
+
+// Table Notification (base existante) — conservée pour compatibilité avec les
+// autres modules et le CRM ; enrichie de façon additive.
+model Notification {
+  id            String              @id @default(uuid())
+  hotelId       String
+  recipientType String // guest, staff
+  recipientId   String
+  channel       NotificationChannel
+  templateCode  String
+  payload       Json?
+  status        NotificationStatus  @default(QUEUED)
+  sentAt        DateTime?
+  error         String?
+  createdAt     DateTime            @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, status])
+}
+
+model LoyaltyTransaction {
+  id           String   @id @default(uuid())
+  guestId      String
+  memberId     String?
+  programId    String?
+  ruleId       String?
+  rewardId     String?
+  hotelId      String
+  type         String // EARN, REDEEM, ADJUST
+  points       Int
+  balanceAfter Int?
+  reference    String?
+  description  String?
+  sourceModule String?
+  createdAt    DateTime @default(now())
+
+  guest  Guest          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  member LoyaltyMember? @relation(fields: [memberId], references: [id])
+  rule   LoyaltyRule?   @relation(fields: [ruleId], references: [id])
+  reward LoyaltyReward? @relation(fields: [rewardId], references: [id])
+
+  @@index([guestId, createdAt])
+  @@index([memberId, createdAt])
+  @@index([hotelId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+//  PROGRAMME DE FIDÉLITÉ (Module 22)
+//  Configurable par hôtel ou groupe d'hôtels. Toute la logique d'attribution des
+//  points est pilotée par des règles en base (LoyaltyRule) : aucun calcul en dur.
+// ---------------------------------------------------------------------------
+
+enum LoyaltyBonusType {
+  WELCOME
+  BIRTHDAY
+  REFERRAL
+  CAMPAIGN
+  OTHER
+}
+
+enum LoyaltyRewardType {
+  DISCOUNT
+  FREE_NIGHT
+  UPGRADE
+  SERVICE
+  VOUCHER
+}
+
+enum LoyaltyNotificationType {
+  POINTS_EARNED
+  POINTS_EXPIRING
+  TIER_UPGRADED
+  TIER_DOWNGRADED
+  REWARD_AVAILABLE
+  REDEMPTION_CONFIRMED
+  WELCOME
+  CAMPAIGN
+}
+
+// Programme de fidélité (par hôtel ou groupe d'hôtels).
+model LoyaltyProgram {
+  id             String    @id @default(uuid())
+  hotelId        String // hôtel gestionnaire (owner) du programme
+  organisationId String
+  name           String
+  scope          String    @default("HOTEL") // HOTEL | GROUP (groupe d'hôtels)
+  description    String?
+  currency       String    @default("XOF")
+  pointsPerSpend Decimal   @default(0) // points par unité monétaire dépensée
+  pointsPerNight Int       @default(0) // points forfaitaires par nuit
+  validityDays   Int       @default(365) // validité des points gagnés
+  isActive       Boolean   @default(true)
+  startDate      DateTime?
+  endDate        DateTime?
+  config         Json? // options extensibles du programme
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  hotel      Hotel                 @relation(fields: [hotelId], references: [id])
+  hotelLinks LoyaltyProgramHotel[]
+  tiers      LoyaltyTier[]
+  rules      LoyaltyRule[]
+  rewards    LoyaltyReward[]
+  bonuses    LoyaltyBonus[]
+  members    LoyaltyMember[]
+
+  @@index([hotelId])
+  @@index([organisationId])
+}
+
+// Association d'un programme à un hôtel (support "groupe d'hôtels").
+model LoyaltyProgramHotel {
+  id        String   @id @default(uuid())
+  programId String
+  hotelId   String
+  createdAt DateTime @default(now())
+
+  program LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  hotel   Hotel          @relation(fields: [hotelId], references: [id])
+
+  @@unique([programId, hotelId])
+  @@index([hotelId])
+}
+
+// Niveau de fidélité (Bronze, Argent, Or, Platine ou personnalisé).
+model LoyaltyTier {
+  id          String   @id @default(uuid())
+  programId   String
+  hotelId     String
+  code        String
+  name        String
+  rank        Int      @default(0) // ordre d'importance (1 = premier / le plus bas)
+  minPoints   Int      @default(0)
+  minStays    Int      @default(0)
+  minSpend    Decimal  @default(0)
+  benefits    Json? // avantages (late checkout, welcome drink, upgrade...)
+  accessRules Json? // règles d'accès au niveau
+  keepRules   Json? // règles de maintien (années, séjours, dépenses)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  program LoyaltyProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  members LoyaltyMember[]
+  hotel   Hotel           @relation(fields: [hotelId], references: [id])
+
+  @@unique([programId, code])
+  @@index([hotelId])
+}
+
+// Moteur de règles : attribution paramétrable des points (sans logique en dur).
+// Le champ `trigger` détermine le type d'événement ; `condition` (Json) porte les
+// critères (montant min, nuits, segment, source...). `points` / `pointsPerUnit` /
+// `multiplier` / `capPerEvent` calculent le gain.
+model LoyaltyRule {
+  id            String   @id @default(uuid())
+  programId     String
+  hotelId       String
+  name          String
+  trigger       String // night_earned | spend_earned | service_earned | promotion | campaign | referral | welcome | birthday | custom
+  condition     Json?
+  points        Int      @default(0) // points forfaitaires
+  pointsPerUnit Decimal  @default(0) // points par unité (XOF, repas...)
+  multiplier    Decimal  @default(1)
+  capPerEvent   Int? // plafond de points par événement
+  priority      Int      @default(100)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  program      LoyaltyProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+  hotel        Hotel                @relation(fields: [hotelId], references: [id])
+
+  @@index([programId, trigger])
+  @@index([hotelId])
+}
+
+// Récompense échangeable contre des points.
+model LoyaltyReward {
+  id           String            @id @default(uuid())
+  programId    String
+  hotelId      String
+  name         String
+  type         LoyaltyRewardType
+  pointsCost   Int               @default(0)
+  value        Decimal           @default(0) // valeur monétaire (réduction, bon d'achat...)
+  description  String?
+  config       Json? // ex : pourcentage de remise, catégorie de chambre, service
+  validityDays Int               @default(365)
+  stock        Int? // quantité disponible (null = illimité)
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  program            LoyaltyProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  redemptions        LoyaltyRedemption[]
+  hotel              Hotel                @relation(fields: [hotelId], references: [id])
+  LoyaltyTransaction LoyaltyTransaction[]
+
+  @@index([hotelId])
+}
+
+// Bonus (bienvenue, anniversaire, parrainage, campagne).
+model LoyaltyBonus {
+  id        String           @id @default(uuid())
+  programId String
+  hotelId   String
+  name      String
+  bonusType LoyaltyBonusType
+  points    Int              @default(0)
+  condition Json? // condition d'éligibilité (guestId, segment, période...)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  program LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  hotel   Hotel          @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId])
+}
+
+// Adhésion d'un client à un programme.
+model LoyaltyMember {
+  id             String    @id @default(uuid())
+  programId      String
+  hotelId        String
+  guestId        String
+  tierId         String?
+  pointsBalance  Int       @default(0)
+  lifetimePoints Int       @default(0)
+  joinedAt       DateTime  @default(now())
+  lastEarnAt     DateTime?
+  expiresAt      DateTime? // expiration des points du compte
+  status         String    @default("ACTIVE") // ACTIVE | SUSPENDED | EXITED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  program       LoyaltyProgram        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  guest         Guest                 @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  tier          LoyaltyTier?          @relation(fields: [tierId], references: [id])
+  transactions  LoyaltyTransaction[]
+  redemptions   LoyaltyRedemption[]
+  notifications LoyaltyNotification[]
+  hotel         Hotel                 @relation(fields: [hotelId], references: [id])
+
+  @@unique([programId, guestId])
+  @@index([hotelId])
+  @@index([guestId])
+}
+
+// Échange de points contre une récompense.
+model LoyaltyRedemption {
+  id          String    @id @default(uuid())
+  memberId    String
+  rewardId    String
+  programId   String
+  hotelId     String
+  guestId     String
+  points      Int       @default(0)
+  status      String    @default("PENDING") // PENDING | CONFIRMED | USED | CANCELLED
+  reference   String? // folio / note de crédit / bon d'achat
+  metadata    Json?
+  redeemedAt  DateTime  @default(now())
+  confirmedAt DateTime?
+  expiresAt   DateTime?
+
+  member LoyaltyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  reward LoyaltyReward @relation(fields: [rewardId], references: [id])
+  hotel  Hotel         @relation(fields: [hotelId], references: [id])
+  Guest  Guest         @relation(fields: [guestId], references: [id])
+
+  @@index([memberId])
+  @@index([hotelId])
+}
+
+// Notification fidélité (solde, expiration, niveau, récompenses).
+model LoyaltyNotification {
+  id        String                  @id @default(uuid())
+  memberId  String
+  guestId   String
+  hotelId   String
+  type      LoyaltyNotificationType
+  title     String
+  body      String?
+  read      Boolean                 @default(false)
+  createdAt DateTime                @default(now())
+
+  member LoyaltyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  hotel  Hotel         @relation(fields: [hotelId], references: [id])
+  Guest  Guest         @relation(fields: [guestId], references: [id])
+
+  @@index([memberId, read])
+  @@index([hotelId])
+}
+
+// ---------------------------------------------------------------------------
+//  SYNCHRONISATION OFFLINE-FIRST (ADR-011 / ADR-013)
+//  Le client utilise UUID v7 + updatedAt + soft-delete. L'outbox journalise les
+//  écritures locales à pousser vers le serveur à la reconnexion.
+// ---------------------------------------------------------------------------
+
+model SyncOutbox {
+  id         String    @id @default(uuid())
+  hotelId    String
+  deviceId   String // identifiant du poste (PWA)
+  entityType String // "Reservation", "Room", "Payment"...
+  entityId   String
+  operation  String // CREATE | UPDATE | DELETE
+  payload    Json // données complètes de l'entité à l'instant de l'écriture
+  status     String    @default("PENDING") // PENDING | SYNCED | FAILED
+  attempts   Int       @default(0)
+  error      String?
+  createdAt  DateTime  @default(now())
+  syncedAt   DateTime?
+
+  @@index([hotelId, status])
+  @@index([entityType, entityId])
+}
+
+// Moteur d'automatisation (déclenché par les événements de domaine)
+model Automation {
+  id            String   @id @default(uuid())
+  hotelId       String
+  event         String // nom de l'événement déclencheur (ex: "reservation.confirmed")
+  name          String
+  condition     Json? // règles de condition (champs, opérateurs, valeurs)
+  actionType    String // notify, housekeeping.create, payment.authorize...
+  actionPayload Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([hotelId, event])
+}
+
+// ---------------------------------------------------------------------------
+//  CHANNEL MANAGER / OTA (Module 25)
+//  Moteur de connecteurs générique (Connector Framework) : chaque OTA
+//  (Booking.com, Expedia, Airbnb, Agoda, Hotelbeds...) est implémenté comme un
+//  connecteur indépendant. Provider-agnostic : l'application n'a aucune
+//  dépendance directe à une plateforme.
+// ---------------------------------------------------------------------------
+
+// Compte / connexion OTA configurable par hôtel.
+model ChannelAccount {
+  id          String    @id @default(uuid())
+  hotelId     String
+  otaKey      String // clé métier du connecteur (booking, expedia, airbnb, agoda, hotelbeds...)
+  name        String // nom d'affichage du compte
+  credentials Json? // identifiants API / tokens / secrets (configurables sans code)
+  config      Json? // paramètres OTA (devise, politiques, préférences)
+  isActive    Boolean   @default(false)
+  lastSyncAt  DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  hotel               Hotel                 @relation(fields: [hotelId], references: [id])
+  mappings            ChannelRoomMapping[]
+  syncJobs            ChannelSyncJob[]
+  logs                ChannelSyncLog[]
+  ChannelRateOverride ChannelRateOverride[]
+
+  @@index([hotelId, otaKey])
+}
+
+// Mapping entre une chambre / type de chambre PMS et une chambre OTA.
+model ChannelRoomMapping {
+  id          String   @id @default(uuid())
+  accountId   String
+  hotelId     String
+  roomTypeId  String // type de chambre PMS
+  otaRoomId   String // identifiant de la chambre côté OTA
+  otaRoomName String? // nom côté OTA
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account  ChannelAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  roomType RoomType       @relation(fields: [roomTypeId], references: [id])
+  hotel    Hotel          @relation(fields: [hotelId], references: [id])
+
+  @@unique([accountId, roomTypeId])
+  @@index([hotelId])
+}
+
+// Job de synchronisation (file d'attente + reprise automatique).
+model ChannelSyncJob {
+  id          String    @id @default(uuid())
+  accountId   String
+  hotelId     String
+  direction   String // outbound (PMS→OTA) | inbound (OTA→PMS)
+  type        String // availability | rates | restrictions | booking | cancellation | mapping
+  status      String    @default("PENDING") // PENDING | RUNNING | SUCCESS | FAILED | RETRYING
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  payload     Json? // données du job
+  result      Json? // résultat / réponse
+  error       String?
+  nextRetryAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  account ChannelAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  hotel   Hotel          @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, status])
+  @@index([accountId, status, nextRetryAt])
+}
+
+// Log détaillé de synchronisation.
+model ChannelSyncLog {
+  id        String   @id @default(uuid())
+  accountId String
+  hotelId   String
+  jobId     String?
+  level     String   @default("INFO") // INFO | WARNING | ERROR
+  message   String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  account ChannelAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  hotel   Hotel          @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, createdAt])
+  @@index([accountId, createdAt])
+}
+
+// Surcharge de tarif envoyée à l'OTA (historique des valeurs poussées).
+model ChannelRateOverride {
+  id         String    @id @default(uuid())
+  accountId  String
+  hotelId    String
+  roomTypeId String
+  ratePlanId String?
+  date       DateTime // jour tarifé
+  price      Int // minor units
+  currency   String    @default("XOF")
+  status     String    @default("SYNCED") // SYNCED | PENDING | FAILED
+  syncedAt   DateTime?
+  createdAt  DateTime  @default(now())
+
+  account ChannelAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  hotel   Hotel          @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, date])
+  @@index([accountId, status])
+}
+
+// ---------------------------------------------------------------------------
+//  PORTAIL CLIENT (Module 26) — PWA, API-first
+//  Espace client : réservations, factures, fidélité, messages, demandes de
+//  services, appareils connectés. Authentification email/téléphone/OTP/OAuth.
+// ---------------------------------------------------------------------------
+
+// Compte portail d'un client (lien vers Guest) + authentification.
+model PortalUser {
+  id            String    @id @default(uuid())
+  hotelId       String // hôtel principal du compte portail
+  guestId       String
+  email         String? // identifiant de connexion (email)
+  phone         String? // identifiant de connexion (téléphone)
+  passwordHash  String? // hash du mot de passe (BCrypt/Argon2)
+  emailVerified Boolean   @default(false)
+  phoneVerified Boolean   @default(false)
+  otpHash       String? // code OTP transitoire (hashé)
+  otpExpiresAt  DateTime?
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  hotel           Hotel                  @relation(fields: [hotelId], references: [id])
+  guest           Guest                  @relation(fields: [guestId], references: [id])
+  devices         PortalDevice[]
+  messages        PortalMessage[]
+  serviceRequests PortalServiceRequest[]
+  notifications   PortalNotification[]
+
+  @@unique([guestId])
+  @@index([hotelId])
+  @@index([email])
+  @@index([phone])
+}
+
+// Appareil connecté / session du portail.
+model PortalDevice {
+  id           String    @id @default(uuid())
+  portalUserId String
+  hotelId      String
+  deviceName   String?
+  platform     String? // web, android, ios, pwa
+  token        String? // token de session / push
+  lastSeenAt   DateTime?
+  isRevoked    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  portalUser PortalUser @relation(fields: [portalUserId], references: [id], onDelete: Cascade)
+  hotel      Hotel      @relation(fields: [hotelId], references: [id])
+
+  @@index([portalUserId])
+  @@index([hotelId])
+}
+
+// Message sécurisé entre le client et l'hôtel.
+model PortalMessage {
+  id           String   @id @default(uuid())
+  hotelId      String
+  portalUserId String
+  guestId      String
+  direction    String   @default("CLIENT_TO_HOTEL") // CLIENT_TO_HOTEL | HOTEL_TO_CLIENT
+  subject      String?
+  body         String
+  readByHotel  Boolean  @default(false)
+  readByGuest  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  portalUser PortalUser @relation(fields: [portalUserId], references: [id], onDelete: Cascade)
+  hotel      Hotel      @relation(fields: [hotelId], references: [id])
+
+  @@index([portalUserId])
+  @@index([hotelId])
+}
+
+// Demande de service depuis le portail.
+model PortalServiceRequest {
+  id           String   @id @default(uuid())
+  hotelId      String
+  portalUserId String
+  guestId      String
+  kind         String // room_service | transport | maintenance | laundry | concierge | other
+  title        String
+  detail       String?
+  status       String   @default("OPEN") // OPEN | IN_PROGRESS | DONE | CANCELLED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  portalUser PortalUser @relation(fields: [portalUserId], references: [id], onDelete: Cascade)
+  hotel      Hotel      @relation(fields: [hotelId], references: [id])
+
+  @@index([portalUserId])
+  @@index([hotelId, status])
+}
+
+// Notification / offre personnalisée envoyée au portail client.
+model PortalNotification {
+  id           String   @id @default(uuid())
+  hotelId      String
+  portalUserId String
+  guestId      String
+  kind         String // promotion | offer | booking | invoice | loyalty | message
+  title        String
+  body         String?
+  link         String?
+  read         Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  portalUser PortalUser @relation(fields: [portalUserId], references: [id], onDelete: Cascade)
+  hotel      Hotel      @relation(fields: [hotelId], references: [id])
+
+  @@index([portalUserId, read])
+  @@index([hotelId])
+}
+
+// ---------------------------------------------------------------------------
+//  ÉVÉNEMENTS & GROUPES (Module 27)
+//  Groupes, entreprises/organisateurs, événements/séminaires, salles,
+//  équipements, contrats/devis, ordres de service, participants, facturation
+//  groupe, coordination housekeeping/restauration/transport.
+// ---------------------------------------------------------------------------
+
+// Groupe de réservation (récurrente / affaires / événement).
+model EventGroup {
+  id             String    @id @default(uuid())
+  hotelId        String
+  companyId      String? // entreprise / agence / organisateur (Company du CRM)
+  name           String
+  type           String    @default("GROUP") // GROUP | CORPORATE | AGENCY | EVENT | TOUR
+  contactName    String?
+  contactEmail   String?
+  contactPhone   String?
+  roomsAllocated Int       @default(0)
+  totalRooms     Int       @default(0)
+  arrivalDate    DateTime?
+  departureDate  DateTime?
+  status         String    @default("PROSPECT") // PROSPECT | CONFIRMED | CHECKED_IN | CHECKED_OUT | CANCELLED
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  hotel         Hotel               @relation(fields: [hotelId], references: [id])
+  company       Company?            @relation(fields: [companyId], references: [id])
+  events        HotelEvent[]
+  serviceOrders EventServiceOrder[]
+  contracts     EventContract[]
+  EventDocument EventDocument[]
+
+  @@index([hotelId, status])
+}
+
+// Salle / espace événementiel.
+model EventVenue {
+  id           String   @id @default(uuid())
+  hotelId      String
+  name         String
+  capacity     Int      @default(0)
+  seatingModes Json? // capacité par configuration (théâtre, banquet, U...)
+  basePrice    Int      @default(0) // minor units
+  currency     String   @default("XOF")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  hotel  Hotel        @relation(fields: [hotelId], references: [id])
+  events HotelEvent[]
+
+  @@index([hotelId])
+}
+
+// Équipement (projecteur, sonorisation, mobilier...).
+model EventEquipment {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String
+  category  String   @default("AV") // AV | FURNITURE | DECOR | OTHER
+  quantity  Int      @default(1)
+  available Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId])
+}
+
+// Événement / séminaire / banquet.
+model HotelEvent {
+  id                String    @id @default(uuid())
+  hotelId           String
+  groupId           String?
+  venueId           String?
+  name              String
+  eventType         String    @default("SEMINAR") // SEMINAR | CONFERENCE | WEDDING | BANQUET | TRAINING | OTHER
+  startAt           DateTime?
+  endAt             DateTime?
+  expectedAttendees Int       @default(0)
+  status            String    @default("PLANNED") // PLANNED | CONFIRMED | IN_PROGRESS | COMPLETED | CANCELLED
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  hotel         Hotel               @relation(fields: [hotelId], references: [id])
+  group         EventGroup?         @relation(fields: [groupId], references: [id])
+  venue         EventVenue?         @relation(fields: [venueId], references: [id])
+  serviceOrders EventServiceOrder[]
+  contracts     EventContract[]
+  EventDocument EventDocument[]
+
+  @@index([hotelId, status])
+  @@index([venueId, startAt])
+}
+
+// Contrat / devis d'un groupe ou événement.
+model EventContract {
+  id           String    @id @default(uuid())
+  hotelId      String
+  groupId      String?
+  eventId      String?
+  title        String
+  contractType String    @default("QUOTE") // QUOTE | CONTRACT
+  amount       Int       @default(0)
+  currency     String    @default("XOF")
+  status       String    @default("DRAFT") // DRAFT | SENT | ACCEPTED | SIGNED | VOID
+  validUntil   DateTime?
+  signedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  hotel Hotel       @relation(fields: [hotelId], references: [id])
+  group EventGroup? @relation(fields: [groupId], references: [id])
+  event HotelEvent? @relation(fields: [eventId], references: [id])
+
+  @@index([hotelId])
+}
+
+// Ordre de service pour un département (housekeeping, restauration, transport).
+model EventServiceOrder {
+  id         String    @id @default(uuid())
+  hotelId    String
+  groupId    String?
+  eventId    String?
+  department String // housekeeping | catering | transport | maintenance | frontdesk
+  title      String
+  detail     String?
+  status     String    @default("PENDING") // PENDING | IN_PROGRESS | DONE | CANCELLED
+  dueAt      DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  hotel Hotel       @relation(fields: [hotelId], references: [id])
+  group EventGroup? @relation(fields: [groupId], references: [id])
+  event HotelEvent? @relation(fields: [eventId], references: [id])
+
+  @@index([hotelId, department])
+}
+
+// Document (contrat, devis, pièce jointe).
+model EventDocument {
+  id        String   @id @default(uuid())
+  hotelId   String
+  groupId   String?
+  eventId   String?
+  name      String
+  kind      String   @default("OTHER") // CONTRACT | QUOTE | ATTACHMENT
+  url       String?
+  createdAt DateTime @default(now())
+
+  hotel Hotel       @relation(fields: [hotelId], references: [id])
+  group EventGroup? @relation(fields: [groupId], references: [id])
+  event HotelEvent? @relation(fields: [eventId], references: [id])
+
+  @@index([hotelId])
+}
+
+// ---------------------------------------------------------------------------
+//  REPORTING & BUSINESS INTELLIGENCE (Module 28)
+//  Tableaux de bord dynamiques, KPI, rapports personnalisés, exports
+//  (PDF/Excel/CSV), planification par email, tableaux de bord multi-hôtels.
+// ---------------------------------------------------------------------------
+
+// Tableau de bord (personnalisable par rôle / par hôtel).
+model BiDashboard {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String
+  role      String? // role cible (DIRECTION, RECEPTION, HOUSEKEEPING, ACCOUNTING, RESTAURANT...)
+  scope     String   @default("HOTEL") // HOTEL | MULTI_HOTEL
+  layout    Json? // disposition des widgets / graphiques
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, role])
+}
+
+// Rapport (opérationnel, financier, commercial, analytique) ou personnalisé.
+model BiReport {
+  id        String   @id @default(uuid())
+  hotelId   String
+  name      String
+  category  String   @default("OPERATIONAL") // OPERATIONAL | FINANCIAL | COMMERCIAL | ANALYTICAL | CUSTOM
+  type      String // revenue | occupancy | kpi | crm | loyalty | pos | housekeeping | maintenance | stock | transport | laundry | channel
+  filters   Json? // filtres avancés (période, canal, type de chambre...)
+  groupBy   String? // day | week | month | roomType | channel
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel      Hotel        @relation(fields: [hotelId], references: [id])
+  BiSchedule BiSchedule[]
+
+  @@index([hotelId, category])
+}
+
+// Planification automatique d'envoi de rapport par email.
+model BiSchedule {
+  id        String    @id @default(uuid())
+  hotelId   String
+  reportId  String?
+  email     String
+  frequency String    @default("DAILY") // DAILY | WEEKLY | MONTHLY
+  format    String    @default("PDF") // PDF | EXCEL | CSV
+  time      String? // heure de planification HH:MM
+  isActive  Boolean   @default(true)
+  lastRunAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  hotel  Hotel     @relation(fields: [hotelId], references: [id])
+  report BiReport? @relation(fields: [reportId], references: [id])
+
+  @@index([hotelId, isActive])
+}
+
+// ---------------------------------------------------------------------------
+//  ADMINISTRATION & PARAMÉTRAGE GLOBAL (Module 29)
+//  Centre d'administration SaaS : configuration dynamique, multi-hôtel,
+//  extensible. Scope SAAS (global) ou HOTEL (par établissement). Chaque entrée
+//  est une paire (catégorie, clé) → valeur JSON.
+// ---------------------------------------------------------------------------
+
+// Entrée de configuration administrative.
+model AdminConfig {
+  id        String   @id @default(uuid())
+  scope     String   @default("HOTEL") // SAAS (global) | HOTEL (par hôtel)
+  hotelId   String? // null si scope=SAAS
+  category  String // saas | hotel | currency | language | timezone | tax | booking_policy | billing | payment_provider | email_provider | sms_provider | whatsapp_provider | ai_provider | ota | loyalty | backup | security | business
+  key       String // clé de configuration
+  value     Json? // valeur JSON (booléen, nombre, string, objet, liste)
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  hotel Hotel? @relation(fields: [hotelId], references: [id])
+
+  @@unique([scope, hotelId, category, key])
+  @@index([scope, hotelId, category])
+}
+
+// ---------------------------------------------------------------------------
+//  API PUBLIQUE & MARKETPLACE (Module 30)
+//  API REST/GraphQL pour développeurs tiers : OAuth2, API Keys, JWT, Webhooks,
+//  versionnement, rate limiting, journalisation, environnement sandbox,
+//  marketplace de connecteurs.
+// ---------------------------------------------------------------------------
+
+// Application tierce (développeur / intégrateur).
+model ApiApp {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  ownerOrgId  String?
+  ownerUserId String?
+  environment String   @default("SANDBOX") // SANDBOX | PRODUCTION
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  credentials ApiCredential[]
+  webhooks    ApiWebhook[]
+  marketplace ApiMarketplaceApp[]
+  logs        ApiAccessLog[]
+}
+
+// Crédential d'accès (API key ou client OAuth2).
+model ApiCredential {
+  id                 String    @id @default(uuid())
+  appId              String
+  kind               String    @default("API_KEY") // API_KEY | OAUTH2_CLIENT | JWT
+  clientId           String    @unique
+  secretHash         String // hash du secret (jamais en clair)
+  scopes             String[] // permissions octroyées (ex: reservations.read)
+  hotels             String[] // hôtels autorisés (vid = tous de l'org)
+  environment        String    @default("SANDBOX")
+  rateLimitPerMinute Int       @default(60)
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  lastUsedAt         DateTime?
+  expiresAt          DateTime?
+
+  app  ApiApp         @relation(fields: [appId], references: [id], onDelete: Cascade)
+  logs ApiAccessLog[]
+
+  @@index([clientId])
+}
+
+// Webhook d'application tierce.
+model ApiWebhook {
+  id        String   @id @default(uuid())
+  appId     String
+  hotelId   String?
+  url       String
+  secret    String?
+  events    String[] // événements souscrits
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  app        ApiApp               @relation(fields: [appId], references: [id], onDelete: Cascade)
+  deliveries ApiWebhookDelivery[]
+
+  @@index([hotelId])
+}
+
+// Historique d'une livraison de webhook.
+model ApiWebhookDelivery {
+  id          String    @id @default(uuid())
+  webhookId   String
+  event       String
+  status      String    @default("PENDING") // PENDING | SUCCESS | FAILED | RETRYING
+  attempts    Int       @default(0)
+  payload     Json?
+  response    String?
+  error       String?
+  nextRetryAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  webhook ApiWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, status])
+}
+
+// Application du marketplace de connecteurs.
+model ApiMarketplaceApp {
+  id          String   @id @default(uuid())
+  appId       String
+  name        String
+  category    String // connector | integration | analytics | payments | other
+  summary     String?
+  iconUrl     String?
+  version     String   @default("1.0.0")
+  isPublished Boolean  @default(false)
+  installs    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  app ApiApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+}
+
+// Journal des accès API (audit + rate limiting).
+model ApiAccessLog {
+  id           String   @id @default(uuid())
+  appId        String?
+  credentialId String?
+  hotelId      String?
+  method       String
+  path         String
+  status       Int
+  latencyMs    Int?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  app        ApiApp?        @relation(fields: [appId], references: [id])
+  credential ApiCredential? @relation(fields: [credentialId], references: [id])
+
+  @@index([appId, createdAt])
+  @@index([credentialId, createdAt])
+  @@index([hotelId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+//  PLATEFORME MOBILE (Module 31) — PWA avancée + API-first
+//  Mode hors connexion (offline-first), sync automatique, notifications push,
+//  installation native, optimisation mobile. Le même backend alimente la PWA
+//  et les futures applications Android/iOS.
+// ---------------------------------------------------------------------------
+
+// Appareil mobile enregistré (PWA / Android / iOS).
+model MobileDevice {
+  id           String    @id @default(uuid())
+  hotelId      String
+  userId       String? // utilisateur staff (ou guest pour le portail)
+  guestId      String?
+  deviceName   String?
+  platform     String? // web | pwa | android | ios
+  installId    String    @unique // id d'installation (install prompt)
+  lastActiveAt DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId])
+  @@index([installId])
+}
+
+// Token de notification push (FCM / APNs / web push).
+model PushToken {
+  id        String   @id @default(uuid())
+  hotelId   String
+  deviceId  String?
+  userId    String?
+  guestId   String?
+  platform  String? // web | android | ios
+  token     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId])
+  @@index([token])
+}
+
+// Journal de synchronisation offline → serveur.
+model MobileSyncLog {
+  id         String    @id @default(uuid())
+  hotelId    String
+  deviceId   String?
+  entityType String // Reservation, Room, Payment...
+  entityId   String
+  operation  String // CREATE | UPDATE | DELETE
+  status     String    @default("PENDING") // PENDING | SYNCED | FAILED
+  error      String?
+  createdAt  DateTime  @default(now())
+  syncedAt   DateTime?
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, status])
+}
+
+// ---------------------------------------------------------------------------
+//  BILLING SAAS & ABONNEMENTS (Module 32) — Super Administration
+//  Cycle de vie des abonnements, plans, facturation, paiements automatiques
+//  (provider-agnostic) et manuels. RLS réservé au Super Admin / admin SaaS.
+// ---------------------------------------------------------------------------
+
+// Plan d'abonnement SaaS.
+model SaasPlan {
+  id                    String   @id @default(uuid())
+  code                  String   @unique
+  name                  String
+  description           String?
+  price                 Int      @default(0) // minor units
+  currency              String   @default("XOF")
+  billingCycle          String   @default("MONTHLY") // MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL
+  trialDays             Int      @default(0)
+  maxUsers              Int      @default(1)
+  maxHotels             Int      @default(1)
+  maxRooms              Int      @default(0)
+  quotaAi               Int      @default(0)
+  quotaEmail            Int      @default(0)
+  quotaSms              Int      @default(0)
+  quotaWhatsapp         Int      @default(0)
+  quotaApi              Int      @default(0)
+  modules               String[] // modules disponibles
+  features              Json? // fonctionnalités incluses
+  allowedPaymentMethods String[] // moyens de paiement autorisés
+  allowedCountries      String[]
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  subscriptions SaasSubscription[]
+
+  @@index([isActive])
+}
+
+// Abonnement d'une organisation.
+model SaasSubscription {
+  id                 String    @id @default(uuid())
+  organisationId     String
+  hotelId            String? // hôtel principal (nullable pour multi-hôtel)
+  planId             String
+  status             String    @default("TRIAL") // TRIAL | ACTIVE | SUSPENDED | CANCELLED | EXPIRED
+  billingCycle       String    @default("MONTHLY")
+  startsAt           DateTime  @default(now())
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  renewsAt           DateTime?
+  cancelledAt        DateTime?
+  price              Int       @default(0)
+  currency           String    @default("XOF")
+  autoRenew          Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organisation Organisation  @relation(fields: [organisationId], references: [id])
+  hotel        Hotel?        @relation(fields: [hotelId], references: [id])
+  plan         SaasPlan      @relation(fields: [planId], references: [id])
+  invoices     SaasInvoice[]
+
+  @@index([organisationId, status])
+  @@index([planId])
+}
+
+// Facture d'abonnement SaaS.
+model SaasInvoice {
+  id             String    @id @default(uuid())
+  organisationId String
+  hotelId        String?
+  subscriptionId String
+  number         String    @unique
+  status         String    @default("PENDING") // PENDING | PAID | OVERDUE | VOID
+  amount         Int       @default(0)
+  taxAmount      Int       @default(0)
+  total          Int       @default(0)
+  currency       String    @default("XOF")
+  vatRate        Decimal   @default(0)
+  issuedAt       DateTime  @default(now())
+  dueAt          DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organisation Organisation     @relation(fields: [organisationId], references: [id])
+  hotel        Hotel?           @relation(fields: [hotelId], references: [id])
+  subscription SaasSubscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([organisationId, status])
+  @@index([subscriptionId])
+}
+
+// Paiement automatique (provider-agnostic) — connecteur de paiement.
+model SaasPayment {
+  id             String   @id @default(uuid())
+  organisationId String
+  hotelId        String?
+  invoiceId      String?
+  subscriptionId String?
+  providerKey    String // stripe | flutterwave | paystack | cinetpay | fedapay | paypal | mobile_money ...
+  amount         Int      @default(0)
+  currency       String   @default("XOF")
+  status         String   @default("PENDING") // PENDING | SUCCESS | FAILED | REFUNDED
+  providerRef    String?
+  error          String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([organisationId, status])
+  @@index([invoiceId])
+}
+
+// Paiement manuel (configurable par pays/devise/plan/hôtel).
+model SaasManualPayment {
+  id             String    @id @default(uuid())
+  organisationId String
+  hotelId        String?
+  subscriptionId String
+  invoiceId      String?
+  methodKey      String // bank_transfer | mobile_money | orange_money | mtn_money | moov | wave | airtel | cheque | cash | custom
+  amount         Int       @default(0)
+  currency       String    @default("XOF")
+  proofType      String? // image | pdf | receipt | screenshot | bank_ref
+  proofUrl       String? // URL de la preuve
+  bankRef        String?
+  comment        String?
+  status         String    @default("PENDING") // PENDING | APPROVED | REJECTED | NEEDS_PROOF
+  reviewComment  String?
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  Hotel          Hotel?    @relation(fields: [hotelId], references: [id])
+
+  @@index([organisationId, status])
+  @@index([subscriptionId])
+}
+
+// Moyen de paiement configurable (automatique ou manuel).
+model SaasPaymentMethod {
+  id         String   @id @default(uuid())
+  methodKey  String   @unique // stripe | bank_transfer | orange_money | wave | cash ...
+  name       String
+  type       String   @default("AUTO") // AUTO | MANUAL
+  isActive   Boolean  @default(true)
+  countries  String[] // pays autorisés
+  currencies String[] // devises autorisées
+  plans      String[] // plans autorisés (codes)
+  hotelIds   String[] // hôtels autorisés (vide = tous)
+  config     Json? // params (compte bancaire, etc.)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  Hotel      Hotel?   @relation(fields: [hotelId], references: [id])
+  hotelId    String?
+
+  @@index([methodKey, isActive])
+}
+
+// Coupon / promotion SaaS.
+model SaasCoupon {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  type      String    @default("PERCENT") // PERCENT | FIXED
+  value     Int       @default(0)
+  maxUses   Int?
+  used      Int       @default(0)
+  planCodes String[]
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  @@index([code, isActive])
+}
+
+// ---------------------------------------------------------------------------
+//  SUPER ADMINISTRATION — SAAS CONTROL CENTER (Module 33)
+//  Licences, support technique, monitoring, sauvegardes, impersonation,
+//  métriques SaaS. Réservé au Super Admin (RLS auth_platform_admin).
+// ---------------------------------------------------------------------------
+
+// Licence SaaS (activation/expiration/renouvellement/quotas/consommation).
+model SaasLicense {
+  id          String   @id @default(uuid())
+  organisationId String
+  subscriptionId String?
+  licenseKey  String   @unique
+  status      String   @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED
+  activatedAt DateTime?
+  expiresAt   DateTime?
+  renewedAt   DateTime?
+  quotaAi     Int      @default(0)
+  quotaEmail  Int      @default(0)
+  quotaSms    Int      @default(0)
+  quotaWhatsapp Int    @default(0)
+  quotaApi    Int      @default(0)
+  usedAi      Int      @default(0)
+  usedEmail   Int      @default(0)
+  usedSms     Int      @default(0)
+  usedWhatsapp Int     @default(0)
+  usedApi     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([organisationId, status])
+}
+
+// Ticket de support technique.
+model SaasSupportTicket {
+  id          String   @id @default(uuid())
+  organisationId String
+  hotelId     String?
+  subject     String
+  description String?
+  status      String   @default("OPEN") // OPEN | ASSIGNED | IN_PROGRESS | RESOLVED | CLOSED
+  priority    String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  slaDueAt    DateTime?
+  assignedTo  String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  hotel    Hotel?              @relation(fields: [hotelId], references: [id])
+  messages SaasSupportMessage[]
+
+  @@index([organisationId, status])
+  @@index([hotelId])
+}
+
+// Message / commentaire interne d'un ticket.
+model SaasSupportMessage {
+  id       String   @id @default(uuid())
+  ticketId String
+  authorId String?
+  body     String
+  isInternal Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  ticket SaasSupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+// Check de monitoring (serveurs, Supabase, API, connecteurs, email, IA, paiements).
+model SaasMonitorCheck {
+  id        String   @id @default(uuid())
+  target    String // servers | supabase | api | ota | email | ai | payments
+  name      String
+  status    String   @default("UP") // UP | DOWN | DEGRADED | WARNING
+  latencyMs Int?
+  detail    String?
+  checkedAt DateTime @default(now())
+
+  @@index([target, checkedAt])
+}
+
+// Sauvegarde (auto/manuelle, restauration, historique).
+model SaasBackup {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   @default("AUTO") // AUTO | MANUAL
+  status      String   @default("PENDING") // PENDING | RUNNING | SUCCESS | FAILED | RESTORED
+  sizeBytes   BigInt?  @default(0)
+  url         String?
+  scheduledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+// Impersonation sécurisée (Login As Hotel Admin).
+model SaasImpersonation {
+  id         String   @id @default(uuid())
+  superAdminId String
+  targetUserId String  // admin hôtel impersonné
+  hotelId    String
+  reason     String?
+  startedAt  DateTime @default(now())
+  endedAt    DateTime?
+
+  @@index([superAdminId, startedAt])
+  @@index([hotelId])
+}
+
+// Métriques SaaS agrégées (tableau de bord global).
+model SaasMetrics {
+  id            String   @id @default(uuid())
+  period        String // day | week | month | year
+  periodStart   DateTime
+  periodEnd     DateTime
+  totalHotels   Int      @default(0)
+  activeHotels  Int      @default(0)
+  suspendedHotels Int    @default(0)
+  totalUsers    Int      @default(0)
+  totalRooms    Int      @default(0)
+  totalBookings Int      @default(0)
+  revenue       Int      @default(0)
+  mrr           Int      @default(0)
+  arr           Int      @default(0)
+  retentionRate Decimal  @default(0)
+  churnRate     Decimal  @default(0)
+  growth        Decimal  @default(0)
+  aiUsage       Int      @default(0)
+  emailUsage    Int      @default(0)
+  smsUsage      Int      @default(0)
+  whatsappUsage Int      @default(0)
+  apiUsage      Int      @default(0)
+  storageUsed   Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([period, periodStart])
+}
+
+// ---------------------------------------------------------------------------
+//  PRODUCTION READINESS, DEVOPS & SÉCURITÉ ENTREPRISE (Module 34)
+//  Health dashboard, incidents de sécurité, rotation des secrets, vérification
+//  d'intégrité des sauvegardes. Réservé au Super Admin.
+// ---------------------------------------------------------------------------
+
+// Check d'état de santé (Health Dashboard).
+model HealthCheck {
+  id          String   @id @default(uuid())
+  component   String // app | supabase | api | ota | ai | payments | email | whatsapp | sms
+  status      String   @default("UP") // UP | DOWN | DEGRADED | WARNING
+  latencyMs   Int?
+  region      String?
+  detail      String?
+  checkedAt   DateTime @default(now())
+
+  @@index([component, checkedAt])
+}
+
+// Incident de sécurité.
+model SecurityIncident {
+  id          String   @id @default(uuid())
+  type        String // brute_force | sql_injection | xss | csrf | unauthorized | anomaly
+  severity    String   @default("LOW") // LOW | MEDIUM | HIGH | CRITICAL
+  source      String?
+  detail      String?
+  status      String   @default("OPEN") // OPEN | INVESTIGATING | MITIGATED | RESOLVED
+  ip          String?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([type, status])
+  @@index([createdAt])
+}
+
+// Rotation des secrets (API Keys, tokens).
+model SecretRotation {
+  id         String   @id @default(uuid())
+  secretKey  String // nom logique (ex: STRIPE_KEY, API_KEY_X)
+  provider   String?
+  rotatedAt  DateTime @default(now())
+  triggeredBy String?
+  reason     String?
+
+  @@index([secretKey, rotatedAt])
+}
+
+// Vérification d'intégrité d'une sauvegarde.
+model IntegrityCheck {
+  id          String   @id @default(uuid())
+  backupId    String?
+  target      String // db | storage | config
+  status      String   @default("PENDING") // PENDING | PASSED | FAILED
+  checksum    String?
+  detail      String?
+  checkedAt   DateTime @default(now())
+
+  @@index([backupId, checkedAt])
+}
+
+// ---------------------------------------------------------------------------
+//  REGISTRY DES PERMISSIONS & STATUTS (seed) — à compléter module par module
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+//  IA (Module 24) — Couche d'assistance LLM Provider-Agnostic.
+//  L'IA est OPTIONNELLE : l'application fonctionne parfaitement sans elle.
+//  Toutes les fonctionnalités ont des équivalents déterministes (non-IA).
+// ---------------------------------------------------------------------------
+
+// Fournisseur LLM configurable par hôtel (provider-agnostic).
+model AiProvider {
+  id          String   @id @default(uuid())
+  hotelId     String
+  name        String // ex: "OpenAI", "Anthropic", "Gemini", "Azure OpenAI", "Ollama"
+  providerKey String // clé métier (openai, anthropic, gemini, azure, ollama)
+  baseUrl     String? // URL API (utile pour Ollama / modèles self-hosted)
+  model       String? // identifiant du modèle
+  credentials Json? // clés API / secrets
+  config      Json? // options (temperature, maxTokens, ...)
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, isActive])
+}
+
+// Configuration par hôtel des fonctionnalités IA activées.
+model AiFeature {
+  id          String   @id @default(uuid())
+  hotelId     String
+  feature     String // assistant, search, suggestions, predictions, alerts, recommendations, prioritization, reports, rag
+  isEnabled   Boolean  @default(false) // désactivé par défaut → IA jamais obligatoire
+  config      Json? // réglages spécifiques à la fonctionnalité
+  quotaPerDay Int      @default(100) // quota journalier de requêtes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@unique([hotelId, feature])
+  @@index([hotelId])
+}
+
+// Journal des requêtes IA (audit complet + quotas).
+model AiRequest {
+  id          String   @id @default(uuid())
+  hotelId     String
+  feature     String
+  providerKey String?
+  promptHash  String? // empreinte du prompt (pas de PII persistée si souhaité)
+  prompt      String? // demande utilisateur
+  response    String?
+  status      String   @default("OK") // OK | QUOTA_EXCEEDED | ERROR | SKIPPED
+  tokensIn    Int      @default(0)
+  tokensOut   Int      @default(0)
+  latencyMs   Int?
+  error       String?
+  actorUserId String?
+  createdAt   DateTime @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, createdAt])
+  @@index([hotelId, feature, createdAt])
+}
+
+// Suggestion IA (check-in/out, upgrade, upsell, cross-sell, fidélisation).
+model AiSuggestion {
+  id        String   @id @default(uuid())
+  hotelId   String
+  guestId   String?
+  kind      String // checkin | checkout | upgrade | upsell | cross_sell | loyalty
+  title     String
+  detail    String?
+  context   Json? // données ayant motivé la suggestion
+  source    String   @default("AI") // AI | RULE (déterministe)
+  status    String   @default("NEW") // NEW | SEEN | APPLIED | DISMISSED
+  createdAt DateTime @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, kind])
+  @@index([guestId])
+}
+
+// Prédiction IA (occupation, revenus, demande, surcharge, stock).
+model AiPrediction {
+  id          String    @id @default(uuid())
+  hotelId     String
+  metric      String // occupancy | revenue | demand | operational_load | stock
+  horizon     String? // day | week | month
+  value       Decimal   @default(0)
+  confidence  Decimal   @default(0)
+  model       String    @default("rule") // rule (déterministe) | llm
+  periodStart DateTime?
+  periodEnd   DateTime?
+  context     Json?
+  createdAt   DateTime  @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, metric])
+  @@index([hotelId, createdAt])
+}
+
+// Alerte intelligente sur anomalie.
+model AiAlert {
+  id        String   @id @default(uuid())
+  hotelId   String
+  severity  String   @default("INFO") // INFO | WARNING | CRITICAL
+  type      String // late_payment | room_unavailable | stock_shortage | recurring_incident | anomaly
+  title     String
+  detail    String?
+  context   Json?
+  status    String   @default("OPEN") // OPEN | ACKNOWLEDGED | RESOLVED
+  source    String   @default("RULE") // RULE | AI
+  createdAt DateTime @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, status])
+  @@index([hotelId, type])
+}
+
+// Recommandation personnalisée basée sur le comportement client.
+model AiRecommendation {
+  id        String   @id @default(uuid())
+  hotelId   String
+  guestId   String
+  kind      String // service | room | dining | spa | activity | loyalty
+  title     String
+  detail    String?
+  score     Decimal  @default(0) // pertinence 0..1
+  context   Json?
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, guestId])
+}

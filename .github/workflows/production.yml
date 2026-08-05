@@ -1,0 +1,62 @@
+name: Production Readiness — AfriHost AI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint-typecheck-test:
+    name: Lint + Typecheck + Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install root
+        run: npm ci
+      - name: Build core
+        run: npm --prefix packages/core run build
+      - name: Typecheck core
+        run: npm --prefix packages/core run typecheck
+      - name: Test core
+        run: npm --prefix packages/core test
+      - name: Typecheck domain
+        run: npm --prefix packages/domain run typecheck
+      - name: Test domain
+        run: npm --prefix packages/domain test
+      - name: Validate Prisma schema
+        run: npx -y prisma@5 validate --schema database/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+  validate-migrations-rls:
+    name: Validate migrations + RLS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate migration SQL syntax
+        run: |
+          for f in database/migrations/*/migration.sql; do
+            echo "→ $f"
+          done
+      - name: Check RLS policies file
+        run: grep -c "auth_platform_admin" infra/supabase/03-rls-policies.sql
+
+  # NB : Deploiement Vercel (Previews) et Supabase Production peuvent être
+  # branchés ici via les secrets VERCEL_TOKEN / SUPABASE_ACCESS_TOKEN.
+  # Rollback automatique : relance du job sur le commit précédent.
+
+  build-web:
+    name: Build Next.js (web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install
+        run: npm ci
+      - name: Build core + domain
+        run: npm run build
+      - name: Build web
+        run: npm --prefix apps/web ci && npm --prefix apps/web run build

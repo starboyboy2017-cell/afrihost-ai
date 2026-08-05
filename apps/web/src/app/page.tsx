@@ -44,9 +44,11 @@ export default function Home() {
         <p className="mt-1 text-sm text-gray-500">
           PMS SaaS multihôtel pour l&apos;Afrique — Production Ready. Sélectionnez un module pour commencer.
         </p>
-        <a href="/api/health" className="mt-2 inline-block rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white">
-          État du système (health check)
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href="/inscription" className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">Inscrire mon hôtel</a>
+          <a href="/connexion" className="rounded-md border px-3 py-1.5 text-xs font-medium">Connexion</a>
+          <a href="/api/health" className="rounded-md border px-3 py-1.5 text-xs text-gray-600">État du système</a>
+        </div>
       </header>
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">

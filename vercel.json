@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm ci && npm run build -w @afrihost/core && npm run build -w @afrihost/domain && npm --prefix apps/web run build",
-  "outputDirectory": "apps/web/.next",
   "framework": "nextjs",
+  "buildCommand": "npx prisma generate --schema database/schema.prisma && npm run build -w @afrihost/core && npm run build -w @afrihost/domain && npm --prefix apps/web run build",
+  "outputDirectory": "apps/web/.next",
   "regions": ["fra1"]
 }

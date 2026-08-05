@@ -2,8 +2,4 @@ node_modules
 dist
 .next
 coverage
-database
-infra
-roadmap
-docs
-.github
+apps/web/.next

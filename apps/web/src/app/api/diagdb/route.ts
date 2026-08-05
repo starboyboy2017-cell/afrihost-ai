@@ -5,6 +5,7 @@ export async function GET() {
   const info: Record<string, unknown> = {};
   info.hasDatabaseUrl = !!process.env.DATABASE_URL;
   info.databaseUrlHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).host : null;
+  info.env = process.env.NODE_ENV;
   try {
     const p = new PrismaClient();
     await p.$queryRaw`select 1 as ok`;

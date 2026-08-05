@@ -67,7 +67,7 @@ export function createSessionToken(userId: string, email: string): string {
 }
 
 /** Types d'une session JWT. */
-export interface SessionPayload {
+export interface SessionPayload extends Record<string, unknown> {
   sub: string;
   email: string;
   iat?: number;

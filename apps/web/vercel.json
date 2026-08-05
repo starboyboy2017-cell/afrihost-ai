@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npx prisma generate --schema database/schema.prisma && npm run build -w @afrihost/core && npm run build -w @afrihost/domain && npm run build",
+  "installCommand": "cd ../.. && npm ci && cd apps/web",
+  "regions": ["fra1"]
+}

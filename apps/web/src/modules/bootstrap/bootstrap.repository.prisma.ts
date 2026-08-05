@@ -23,13 +23,14 @@ export class PrismaBootstrapRepository implements BootstrapRepository {
   }
   async createFirstSuperAdmin(input: { email: string; passwordHash: string; firstName?: string; lastName?: string }): Promise<SuperAdminAccount> {
     // L'organisation "platform" doit exister pour la clé étrangère.
-    await prisma.organisation.upsert({
+    // NB : on récupère son id réel (UUID) — pas la chaîne littérale "platform".
+    const org = await prisma.organisation.upsert({
       where: { slug: "platform" },
       update: {},
       create: { name: "AfriHost AI Platform", slug: "platform", legalName: "AfriHost AI" },
     });
     const u = await prisma.user.create({
-      data: { organisationId: "platform", email: input.email, passwordHash: input.passwordHash, firstName: input.firstName ?? "Super", lastName: input.lastName ?? "Admin", isSuperAdmin: true, mustChangePassword: true },
+      data: { organisationId: org.id, email: input.email, passwordHash: input.passwordHash, firstName: input.firstName ?? "Super", lastName: input.lastName ?? "Admin", isSuperAdmin: true, mustChangePassword: true },
     });
     return { id: u.id, email: u.email, mustChangePassword: u.mustChangePassword, twoFactorEnabled: u.twoFactorEnabled };
   }
